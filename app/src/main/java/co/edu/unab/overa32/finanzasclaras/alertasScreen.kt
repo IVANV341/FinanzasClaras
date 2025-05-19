@@ -1,6 +1,5 @@
 package co.edu.unab.overa32.finanzasclaras
 
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,10 +12,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview // <-- Importación para @Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController // <-- Importación para rememberNavController
+import androidx.compose.material3.MaterialTheme // <-- Importación para envolver el preview
 import java.text.NumberFormat // Para formatear el saldo como moneda
 import java.util.Locale // Para especificar la localización del formato
 
@@ -40,23 +41,23 @@ val TextColorGray = Color.Gray // Texto gris secundario (si se usa)
 @OptIn(ExperimentalMaterial3Api::class) // Para TopAppBar
 @Composable
 fun AlertasScreen(
-    myNavController: NavHostController, // Acción para el botón de volver
-    onBackClick: () -> Unit,
-    onAddAlertClick: () -> Unit, // Acción para el botón "+" de añadir alerta){}
-    function: () -> Unit
+    myNavController: NavHostController,
+    onBackClick: () -> Unit, // Acción para el botón de volver
+    onAddAlertClick: () -> Unit, // Acción para el botón "+" de añadir alerta
+    function: () -> Unit // <-- Función adicional que recibe
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Alertas", color = TextColorWhite) }, // Título blanco
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = onBackClick) { // Usa la lambda onBackClick
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = TextColorWhite) // Icono blanco
                     }
                 },
                 actions = {
                     // Botón "+" para añadir nueva alerta
-                    IconButton(onClick = onAddAlertClick) {
+                    IconButton(onClick = onAddAlertClick) { // Usa la lambda onAddAlertClick
                         Icon(Icons.Filled.Add, contentDescription = "Añadir Alerta", tint = TextColorWhite) // Icono blanco
                     }
                 },
@@ -75,14 +76,11 @@ fun AlertasScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp) // Espacio entre los elementos principales
         ) {
             // --- Lista de Umbrales de Alerta ---
-            // Como la lista en la imagen parece fija y pequeña, usamos Column.
-            // Para una lista potencialmente larga, usar LazyColumn sería más eficiente.
+            // Usamos los datos de ejemplo para el preview:
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp) // Espacio entre los umbrales individuales
             ) {
-                // Aquí deberías pasar tu lista real de AlertThresholds
-                // Usamos datos de ejemplo por ahora:
                 sampleAlertThresholds.forEach { alert ->
                     AlertThresholdItem(alert = alert)
                 }
@@ -92,10 +90,10 @@ fun AlertasScreen(
             Spacer(Modifier.height(32.dp)) // Espacio mayor
 
             // --- Sección de Saldo Total ---
-            SaldoDisplayCard(label = "saldo total:", amount = 15400000.00) // Usamos una función auxiliar
+            SaldoDisplayCard(label = "saldo total:", amount = 15400000.00) // Usa la función auxiliar
 
             // --- Sección de Saldo Actual ---
-            SaldoDisplayCard(label = "saldo actual", amount = 1500000.00) // Usamos la misma función
+            SaldoDisplayCard(label = "saldo actual", amount = 1500000.00) // Usa la misma función
 
             // Si hubiera espacio restante, puedes empujar los elementos hacia arriba
             // Spacer(Modifier.weight(1f))
@@ -106,7 +104,6 @@ fun AlertasScreen(
 // --- 4. Composable para un Item Individual de Umbral de Alerta ---
 @Composable
 fun AlertThresholdItem(alert: AlertThreshold) {
-    // Usamos una Card para el contenedor con esquinas redondeadas y fondo oscuro
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp), // Esquinas redondeadas
@@ -199,6 +196,36 @@ val sampleAlertThresholds = listOf(
 )
 
 
+// --- Función @Preview para AlertasScreen ---
+// Esta función va DESPUÉS de la definición de AlertasScreen.
+@Preview(showBackground = true, showSystemUi = true, name = "Alertas Screen Preview")
+@Composable
+fun AlertasScreenPreview() {
+    // Aquí proporcionamos el entorno necesario para que el preview funcione.
+    MaterialTheme { // Envuelve con el tema Material 3 (o tu tema personalizado)
+        // Creamos un NavController de prueba. No navega, solo permite que el código compile.
+        val navController = rememberNavController()
+
+        // Proporcionamos lambdas de prueba para las acciones de clic y la función adicional
+        val previewOnBackClick: () -> Unit = {
+            println("Preview: Botón Volver clickeado") // Puedes poner un log
+        }
+        val previewOnAddAlertClick: () -> Unit = {
+            println("Preview: Botón Añadir Alerta clickeado") // Puedes poner un log
+        }
+        val previewFunction: () -> Unit = {
+            println("Preview: Función adicional llamada") // Puedes poner un log
+        }
+
+        // Llama a la Composable que queremos previsualizar
+        AlertasScreen(
+            myNavController = navController as NavHostController, // Casteo necesario para NavHostController
+            onBackClick = previewOnBackClick,
+            onAddAlertClick = previewOnAddAlertClick,
+            function = previewFunction // Pasa la lambda de prueba para 'function'
+        )
+    }
+}
 
 // --- Cómo integrar en tu MainActivity ---
 /*
@@ -207,26 +234,38 @@ package co.edu.unab.overa32.finanzasclaras // Tu paquete
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-// Importa tu tema y la pantalla de alertas
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+// Importa tu tema y las pantallas necesarias
 import co.edu.unab.overa32.finanzasclaras.ui.theme.FinanzasClarasTheme
-import co.edu.unab.overa32.finanzasclaras.AlertasScreen // *** Importa la pantalla de alertas ***
+// Importa las pantallas que necesites: AlertasScreen, PantallaPrincipalUI, etc.
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FinanzasClarasTheme { // Aplica tu tema
-                // Si usas Navigation Compose, la navegación manejaría esto
-                AlertasScreen(
-                    onBackClick = {
-                        // TODO: Implementar navegación hacia atrás
-                        // navigator.popBackStack()
-                    },
-                    onAddAlertClick = {
-                        // TODO: Implementar navegación a la pantalla para añadir/editar alerta
-                        // navigator.navigate("ruta_para_añadir_alerta")
+                val navController = rememberNavController()
+                NavHost(navController = navController, startDestination = "mainScreen") {
+                    composable("mainScreen") {
+                        // Aquí llamas a PantallaPrincipalUI con los parámetros correctos
+                        // PantallaPrincipalUI(saldoTotal = ..., navController = navController)
                     }
-                )
+                    composable("alertasScreen") { // Define la ruta para esta pantalla
+                         AlertasScreen(
+                            myNavController = navController, // Pasas el controlador real
+                            onBackClick = { navController.popBackStack() }, // Implementa la navegación real hacia atrás
+                            onAddAlertClick = {
+                                // TODO: Navegar a la pantalla para añadir/editar alertas
+                                // navController.navigate("ruta_añadir_alerta")
+                            },
+                            function = { /* Implementa la lógica real de esta función si es necesaria */ }
+                        )
+                    }
+                    // Define otras rutas (tablaGastos, addGasto, ajustes, addSaldo, aiScreen)
+                }
             }
         }
     }

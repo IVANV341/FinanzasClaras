@@ -5,16 +5,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-// *** Importa el ícono de enviar ***
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Send // Importa el ícono de enviar
 import androidx.compose.material3.* // Usamos Material 3 components
 import androidx.compose.runtime.* // Para remember y mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview // <-- Importación para @Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController // <-- Importación para rememberNavController
+import androidx.compose.material3.MaterialTheme // <-- Importación para envolver el preview
 
 // --- 1. Definiciones de Colores --- (Iguales que antes)
 val SoftBackgroundColor = Color(0xFFD1C4E9) // Un lavanda/púrpura suave para el fondo
@@ -30,8 +32,8 @@ val PlaceholderTextColor = Color.Gray // Color para el texto de placeholder en e
 @Composable
 fun IaScreen(
     myNavController: NavHostController,
-    onBackClick: () -> Unit, // Acción para el botón de volver){}
-    function: () -> Unit
+    onBackClick: () -> Unit, // Acción para el botón de volver
+    function: () -> Unit // <-- Función adicional que recibe
     // Puedes añadir un parámetro para enviar el mensaje si la lógica está fuera
     // onSendMessage: (String) -> Unit
 ) {
@@ -43,7 +45,7 @@ fun IaScreen(
             TopAppBar(
                 title = { Text("Asistente IA", color = TextColorOnDark) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = onBackClick) { // Usa la lambda onBackClick
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = TextColorOnDark)
                     }
                 },
@@ -68,6 +70,8 @@ fun IaScreen(
                 isAiMessage = true,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            // Aquí iría la lista dinámica de mensajes, pero por ahora son estáticos
 
             // --- Espacio para que los mensajes empujen el área de entrada hacia abajo ---
             Spacer(Modifier.weight(1f))
@@ -100,13 +104,14 @@ fun IaScreen(
                     )
                 )
 
-                // *** BOTÓN DE ENVIAR (Cambiado a ícono) ***
-                Button( // Usamos Button para poder controlar el color de fondo fácilmente y la forma
+                // *** BOTÓN DE ENVIAR ***
+                Button(
                     onClick = {
                         // TODO: Implementar acción de enviar el mensaje
                         if (inputText.isNotBlank()) {
-                            println("Mensaje enviado: $inputText") // Ejemplo
-                            // onSendMessage(inputText) // Llama a la lambda si aplica
+                            println("Mensaje enviado: $inputText") // Ejemplo: Imprime en la consola
+                            // onSendMessage(inputText) // Llama a la lambda si la agregaste
+                            function() // Llama a la función adicional
                             inputText = "" // Limpiar campo
                         }
                     },
@@ -114,10 +119,10 @@ fun IaScreen(
                         .size(56.dp), // Tamaño del área del botón
                     shape = RoundedCornerShape(28.dp), // Forma redondeada consistente
                     colors = ButtonDefaults.buttonColors(containerColor = SendButtonColor), // Color verde
-                    contentPadding = PaddingValues(0.dp) // Elimina padding interno para que el icono ocupe más espacio
+                    contentPadding = PaddingValues(0.dp) // Elimina padding interno
                 ) {
-                    Icon( // *** Usamos el composable Icon ***
-                        imageVector = Icons.Default.Send, // *** El ícono de enviar ***
+                    Icon( // Usa el composable Icon
+                        imageVector = Icons.Default.Send, // El ícono de enviar
                         contentDescription = "Enviar Mensaje",
                         tint = TextColorOnDark // Color del ícono (blanco)
                     )
@@ -134,17 +139,45 @@ fun MessageBubble(text: String, isAiMessage: Boolean, modifier: Modifier = Modif
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MessageBubbleColor)
+        colors = CardDefaults.cardColors(containerColor = MessageBubbleColor) // Usa el color definido
     ) {
         Text(
             text = text,
-            color = TextColorOnDark,
+            color = TextColorOnDark, // Usa el color definido
             fontSize = 16.sp,
             modifier = Modifier.padding(12.dp)
         )
     }
 }
 
+
+// --- Función @Preview para IaScreen ---
+// Esta función va DESPUÉS de la definición de IaScreen.
+@Preview(showBackground = true, showSystemUi = true, name = "AI Screen Preview")
+@Composable
+fun IaScreenPreview() {
+    // Aquí proporcionamos el entorno necesario para que el preview funcione.
+    MaterialTheme { // Envuelve con el tema Material 3 (o tu tema personalizado si tienes uno)
+        // Creamos un NavController de prueba. No navega, solo permite que el código compile.
+        val navController = rememberNavController()
+
+        // Proporcionamos lambdas de prueba para onBackClick y function
+        val previewOnBackClick: () -> Unit = {
+            println("Preview: Botón Volver clickeado") // Puedes poner un log
+        }
+        val previewFunction: () -> Unit = {
+            println("Preview: Función adicional llamada") // Puedes poner un log
+        }
+
+
+        // Llama a la Composable que queremos previsualizar
+        IaScreen(
+            myNavController = navController as NavHostController, // Casteo necesario para NavHostController
+            onBackClick = previewOnBackClick,
+            function = previewFunction
+        )
+    }
+}
 
 // --- Cómo integrar en tu MainActivity --- (Igual que antes)
 /*
@@ -153,22 +186,35 @@ package co.edu.unab.overa32.finanzasclaras // Tu paquete
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-// Importa tu tema y la pantalla de IA
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+// Importa tu tema y la pantalla de IA, etc.
 import co.edu.unab.overa32.finanzasclaras.ui.theme.FinanzasClarasTheme
-import co.edu.unab.overa32.finanzasclaras.IaScreen
+// Importa las pantallas que necesites: IaScreen, PantallaPrincipalUI, etc.
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FinanzasClarasTheme { // Aplica tu tema
-                // Navegación
-                IaScreen(
-                    onBackClick = {
-                        // TODO: Implementar navegación hacia atrás
+                val navController = rememberNavController()
+                NavHost(navController = navController, startDestination = "mainScreen") {
+                    composable("mainScreen") {
+                        // Aquí llamas a PantallaPrincipalUI con los parámetros correctos
+                        // PantallaPrincipalUI(saldoTotal = ..., navController = navController)
                     }
-                    // onSendMessage = { message -> ... }
-                )
+                    composable("aiScreen") {
+                         IaScreen(
+                            myNavController = navController, // Pasas el controlador real
+                            onBackClick = { navController.popBackStack() }, // Implementa la navegación real hacia atrás
+                            function = { /* Implementa la lógica real de esta función */ }
+                            // onSendMessage = { message -> ... } // Implementa la lógica de enviar
+                        )
+                    }
+                    // Define otras rutas (tablaGastos, addGasto, ajustes, addSaldo)
+                }
             }
         }
     }

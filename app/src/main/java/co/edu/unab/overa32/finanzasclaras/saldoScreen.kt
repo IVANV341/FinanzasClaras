@@ -1,6 +1,7 @@
 package co.edu.unab.overa32.finanzasclaras // Reemplaza con tu paquete
 
-import android.widget.Toast
+import android.content.Context // Necesario para SaldoDataStore y File
+import android.widget.Toast // Necesario para mostrar mensajes al usuario
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -31,24 +32,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview // <-- Importación para @Preview!
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController // <-- Importación para el Preview!
-import androidx.compose.material3.MaterialTheme // <-- Importación para envolver el preview!
+import androidx.navigation.compose.rememberNavController // <-- Importación para rememberNavController
+import androidx.compose.material3.MaterialTheme // <-- Importación para envolver el preview
+import androidx.compose.ui.tooling.preview.Preview
 
-// Necesarias para Coroutines y DataStore
+// Necesarias para Coroutines y DataStore/File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first // <-- Importación para obtener el primer valor del Flow
-import kotlinx.coroutines.flow.flowOf // <-- Importación para flowOf en el mock del Preview
 
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.io.File // <-- Importación para manejo de archivos
+import java.text.SimpleDateFormat // <-- Importación para formato de fecha
+import java.util.Date // <-- Importación para fecha actual
+import java.util.Locale // <-- Importación para localización de fecha
 
 // Asegúrate de que tu clase SaldoDataStore esté importada o en el mismo paquete
 // import co.edu.unab.overa32.finanzasclaras.SaldoDataStore
@@ -56,8 +56,12 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddGastoScreen(navController: NavController, saldoDataStore: SaldoDataStore){ // <-- Recibe SaldoDataStore
+fun SaldoScreen(navController: NavController){
     val context = LocalContext.current
+    // Instancia de SaldoDataStore usando el contexto
+    // Si da problemas en el preview, considera mockear SaldoDataStore aquí.
+    val saldoDataStore = remember { SaldoDataStore(context) }
+
 
     var descripcion by remember { mutableStateOf("") }
     var monto by remember { mutableStateOf("") }
@@ -65,7 +69,7 @@ fun AddGastoScreen(navController: NavController, saldoDataStore: SaldoDataStore)
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Añadir Gasto") },
+                title = { Text("Añadir Saldo") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -82,14 +86,14 @@ fun AddGastoScreen(navController: NavController, saldoDataStore: SaldoDataStore)
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Añadir Gasto", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("Añadir Saldo", fontSize = 24.sp, fontWeight = FontWeight.Bold)
 
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = descripcion,
                 onValueChange = { descripcion = it },
-                label = { Text("Descripción") },
+                label = { Text("Descripción (Opcional)") },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -106,73 +110,92 @@ fun AddGastoScreen(navController: NavController, saldoDataStore: SaldoDataStore)
             Button(
                 onClick = {
                     val montoDouble = monto.toDoubleOrNull()
-                    if (montoDouble != null && montoDouble > 0 && descripcion.isNotBlank()) {
+                    if (montoDouble != null && montoDouble > 0) {
                         val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-                        // --- Cambiamos el formato y nombre del archivo ---
-                        val lineaMovimiento = "gasto|$descripcion|$montoDouble|$currentDate\n" // Añadimos el tipo "gasto" y salto de línea
-                        val file = File(context.filesDir, "movimientos.txt") // <-- Nombre del archivo cambiado
+                        // Si la descripción está vacía, usar un valor por defecto
+                        val descMovimiento = if (descripcion.isBlank()) "Ingreso" else descripcion.trim()
 
                         // --- Lógica para guardar el movimiento y actualizar el saldo ---
-                        CoroutineScope(Dispatchers.IO).launch {
-                            // 1. Guardar el movimiento en el archivo común
-                            file.appendText(lineaMovimiento) // Usa appendText, maneja si el archivo existe o no
+                        // Cambiamos el formato y nombre del archivo para registrar el ingreso
+                        val lineaMovimiento = "saldo|$descMovimiento|$montoDouble|$currentDate\n" // Añadimos el tipo "saldo"
+                        val file = File(context.filesDir, "movimientos.txt") // <-- Nombre del archivo común
 
-                            // 2. Leer el saldo actual del DataStore
+                        // Lanzamos una coroutine porque las operaciones de archivo/DataStore pueden ser lentas/suspend
+                        CoroutineScope(Dispatchers.IO).launch {
+                            // 1. Guardar el movimiento de ingreso en el archivo común
+                            file.appendText(lineaMovimiento) // Usa appendText
+
+                            // 2. Leer el saldo actual desde SaldoDataStore
                             val saldoActual = saldoDataStore.getSaldo.first()
 
-                            // 3. Restarle el monto del gasto
-                            val nuevoSaldoTotal = saldoActual - montoDouble
+                            // 3. Sumarle el monto del ingreso
+                            val nuevoSaldoTotal = saldoActual + montoDouble
 
                             // 4. Guardar el nuevo saldo total en el DataStore
                             saldoDataStore.saveSaldo(nuevoSaldoTotal)
 
                             // Mostrar mensaje de éxito y volver a la pantalla anterior (en el hilo principal)
                             launch(Dispatchers.Main) {
-                                Toast.makeText(context, "Gasto registrado y saldo actualizado", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Saldo registrado y actualizado", Toast.LENGTH_SHORT).show()
                                 navController.popBackStack()
                             }
                         }
 
                     } else {
-                        val errorMessage = if (montoDouble == null || montoDouble <= 0) {
-                            "Por favor ingresa un monto válido mayor a cero."
-                        } else {
-                            "Por favor completa la descripción."
-                        }
-                        Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Por favor ingresa un monto válido mayor a cero", Toast.LENGTH_SHORT).show()
                     }
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1976D2), // Azul
+                    containerColor = Color(0xFF4CAF50), // Color verde
                     contentColor = Color.White
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Guardar Gasto")
+                Text("Guardar Saldo")
             }
         }
     }
 }
 
-// --- Función @Preview para AddGastoScreen ---
-@Preview(showBackground = true, showSystemUi = true, name = "Add Gasto Screen Preview")
+// --- Función @Preview para SaldoScreen ---
+// Se mantiene igual. Necesita un mock de SaldoDataStore si no lo recibe como parámetro.
+// En este caso, SaldoScreen no recibe SaldoDataStore como parámetro, lo instancia localmente.
+// Esto puede ser problemático para mocking en preview. Una mejor práctica sería pasarlo como parámetro.
+// Para que el preview compile con la estructura actual, SaldoDataStore debe poder instanciarse con un contexto de preview.
+@Preview(showBackground = true, showSystemUi = true, name = "Saldo Screen Preview")
 @Composable
-fun AddGastoScreenPreview() {
+fun SaldoScreenPreview() {
     MaterialTheme {
         val navController = rememberNavController()
-        val previewContext = LocalContext.current
+        // Si SaldoDataStore no requiere parámetros complejos más allá del Context,
+        // debería poder instanciarse aquí con LocalContext.current.
+        // Si SaldoDataStore tuviera dependencias, necesitarías mockearlo aquí.
+        // Como SaldoScreen instancia SaldoDataStore internamente, el preview llamará a esa instanciación.
+        // Si SaldoDataStore requiere 'open' miembros para mocks en otras pantallas, manten eso.
 
-        // Creamos un mock simple de SaldoDataStore para el preview.
-        // Asumimos que getSaldo y saveSaldo son 'open' en SaldoDataStore.
-        val mockSaldoDataStore = remember {
-            object : SaldoDataStore(previewContext) {
-                override val getSaldo: kotlinx.coroutines.flow.Flow<Double> = kotlinx.coroutines.flow.flowOf(1000000.0)
-                override suspend fun saveSaldo(saldo: Double) {
-                    println("Preview Mock: Intentando guardar saldo $saldo")
-                }
-            }
-        }
-        // Llama a la Composable que queremos previsualizar, pasando el mock
-        AddGastoScreen(navController = navController, saldoDataStore = mockSaldoDataStore)
+        // Llama a la Composable que queremos previsualizar
+        SaldoScreen(navController = navController)
     }
 }
+
+// --- Tu clase SaldoDataStore ---
+/*
+// Asegúrate de que esta clase esté en tu proyecto en el paquete correcto y con los miembros 'open'.
+// package co.edu.unab.overa32.finanzasclaras
+// import android.content.Context
+// import androidx.datastore.preferences.core.doublePreferencesKey
+// import androidx.datastore.preferences.core.edit
+// import androidx.datastore.preferences.preferencesDataStore
+// import kotlinx.coroutines.flow.Flow
+// import kotlinx.coroutines.flow.map
+// import kotlinx.coroutines.flow.first
+// import kotlinx.coroutines.flow.flowOf // Para mocks
+
+// val Context.dataStore by preferencesDataStore(name = "saldo_prefs")
+
+// open class SaldoDataStore(...) {
+//    companion object { ... }
+//    open val getSaldo: Flow<Double> = ...
+//    open suspend fun saveSaldo(saldo: Double) { ... }
+// }
+*/

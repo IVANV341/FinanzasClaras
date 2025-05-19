@@ -1,6 +1,5 @@
 package co.edu.unab.overa32.finanzasclaras
 
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,12 +9,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.* // Usamos Material 3 components
-import androidx.compose.runtime.* // Para remember y mutableStateOf (si un item necesita estado local)
+import androidx.compose.runtime.* // Para remember, mutableStateOf, etc.
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview // <-- Importación para @Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController // <-- Importación para rememberNavController
+import androidx.compose.material3.MaterialTheme // <-- Importación para envolver el preview
+
 
 // --- 1. Clase Sellada para Representar Tipos de Items de Ajustes ---
 // Esto nos ayuda a tener diferentes tipos de filas en nuestra lista
@@ -65,15 +67,15 @@ val sampleSettingsList: List<SettingsItem> = listOf(
 @Composable
 fun AjustesScreen(
     myNavController: NavHostController,
-    onBackClick: () -> Unit, // Acción para el botón de volver){}
-    function: () -> Unit
+    onBackClick: () -> Unit, // Acción para el botón de volver
+    function: () -> Unit // <-- Función adicional que recibe
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Ajustes", color = MaterialTheme.colorScheme.onSurface) }, // Color de texto desde el tema
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = onBackClick) { // Usa la lambda onBackClick
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.onSurface) // Color de icono desde el tema
                     }
                 },
@@ -104,6 +106,9 @@ fun AjustesScreen(
             }
         }
     }
+    // Aunque 'function' no se usa visualmente en la UI, se recibe como parámetro.
+    // Si se necesitara que hiciera algo en respuesta a un evento de UI, se llamaría aquí.
+    // Por ejemplo, si un botón llamara a `function()`.
 }
 
 // --- 4. Composable para un Encabezado de Sección ---
@@ -149,7 +154,8 @@ fun ClickableSettingItem(item: SettingsItem.ClickableItem) {
         }
 
         // Ícono de flecha si es clickeable y lleva a otra pantalla (opcional)
-        if (item.onClick != { /* TODO: ... */ } && item.id != "app_version") { // No mostrar flecha si es solo para mostrar info o acción directa
+        // Excluimos el item "app_version" y el item "logout" de mostrar la flecha típicamente
+        if (item.id != "app_version" && item.id != "logout") {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward, // Ícono de flecha
                 contentDescription = null, // No necesita descripción para accesibilidad si es solo visual
@@ -157,21 +163,34 @@ fun ClickableSettingItem(item: SettingsItem.ClickableItem) {
             )
         }
         // Si es el item de Logout, podrías darle un color diferente al texto (ej. rojo)
-        // if (item.id == "logout") { /* Aplicar color rojo al Text */ }
+        // Aquí solo cambiamos el color del texto del título para el logout
+        if (item.id == "logout") {
+            Text(
+                text = item.title, // Repetimos el texto del título
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error // Color de error para indicar acción destructiva
+            )
+        }
     }
-    Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp) // Separador después del item
+    // Añadimos un Divider después de cada item clickeable
+    Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
 }
 
 // --- 6. Composable para un Item de Ajuste con Interruptor ---
 @Composable
 fun ToggleSettingItem(item: SettingsItem.ToggleItem) {
     // Estado local para el switch. En una app real, este estado vendría de un ViewModel
+    // o se manejaría directamente en la lambda onToggle para actualizar el estado externo.
+    // Para el preview, el estado local 'isChecked' funciona bien.
     var isChecked by remember { mutableStateOf(item.isEnabled) }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = { isChecked = !isChecked; item.onToggle(isChecked) }) // Hace la fila clickeable y alterna el switch
+            .clickable(onClick = { // Hace la fila clickeable y alterna el switch
+                isChecked = !isChecked // Alterna el estado local
+                item.onToggle(isChecked) // Llama a la lambda para notificar al exterior
+            })
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -200,10 +219,42 @@ fun ToggleSettingItem(item: SettingsItem.ToggleItem) {
                 item.onToggle(enabled) // Llama a la lambda para notificar al exterior
             },
             // Puedes personalizar los colores del Switch aquí si no te gustan los del tema
-            // colors = SwitchDefaults.colors(...)
+            // colors = SwitchDefaults.colors(...) // Descomenta y configura si necesitas colores específicos
         )
     }
-    Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp) // Separador después del item
+    // Añadimos un Divider después de cada item con interruptor
+    Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
+}
+
+
+// --- Función @Preview para AjustesScreen ---
+// Esta función va DESPUÉS de la definición de AjustesScreen.
+@Preview(showBackground = true, showSystemUi = true, name = "Ajustes Screen Preview")
+@Composable
+fun AjustesScreenPreview() {
+    // Aquí proporcionamos el entorno necesario para que el preview funcione.
+    // Es crucial envolverlo en MaterialTheme para que los colores y la tipografía del tema se apliquen.
+    MaterialTheme { // Envuelve con el tema Material 3 (o tu tema personalizado)
+        // Creamos un NavController de prueba. No navega, solo permite que el código compile.
+        val navController = rememberNavController()
+
+        // Proporcionamos lambdas de prueba para las acciones de clic y la función adicional
+        val previewOnBackClick: () -> Unit = {
+            println("Preview: Botón Volver clickeado") // Puedes poner un log
+        }
+        val previewFunction: () -> Unit = {
+            println("Preview: Función adicional llamada") // Puedes poner un log
+        }
+
+        // Llama a la Composable que queremos previsualizar
+        AjustesScreen(
+            myNavController = navController as NavHostController, // Casteo necesario para NavHostController
+            onBackClick = previewOnBackClick,
+            function = previewFunction // Pasa la lambda de prueba para 'function'
+            // Nota: Los lambdas onClick y onToggle dentro de sampleSettingsList
+            // también funcionarán en el preview imprimiendo mensajes.
+        )
+    }
 }
 
 
@@ -214,22 +265,36 @@ package co.edu.unab.overa32.finanzasclaras // Tu paquete
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-// Importa tu tema y la pantalla de ajustes
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+// Importa tu tema y las pantallas necesarias
 import co.edu.unab.overa32.finanzasclaras.ui.theme.FinanzasClarasTheme
-import co.edu.unab.overa32.finanzasclaras.AjustesScreen // *** Importa la pantalla de ajustes ***
+// Importa las pantallas que necesites: AjustesScreen, PantallaPrincipalUI, etc.
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FinanzasClarasTheme { // Aplica tu tema
-                // Aquí deberías tener la navegación de tu app (ej: usando NavHostController)
-                AjustesScreen(
-                    onBackClick = {
-                        // TODO: Implementar navegación hacia atrás
-                        // navigator.popBackStack() // Ejemplo con Navigation Compose
+                val navController = rememberNavController()
+                NavHost(navController = navController, startDestination = "mainScreen") {
+                    composable("mainScreen") {
+                        // Aquí llamas a PantallaPrincipalUI con los parámetros correctos
+                        // PantallaPrincipalUI(saldoTotal = ..., navController = navController)
                     }
-                )
+                    composable("ajustes") { // Define la ruta para esta pantalla
+                         AjustesScreen(
+                            myNavController = navController, // Pasas el controlador real
+                            onBackClick = { navController.popBackStack() }, // Implementa la navegación real hacia atrás
+                             function = { /* Implementa la lógica real de esta función si es necesaria */ }
+                             // En una app real, los lambdas onClick y onToggle en la lista de ajustes
+                             // llamarían a funciones en un ViewModel para actualizar el estado o navegar.
+                        )
+                    }
+                    // Define otras rutas (tablaGastos, addGasto, addSaldo, aiScreen, alertasScreen)
+                }
             }
         }
     }
