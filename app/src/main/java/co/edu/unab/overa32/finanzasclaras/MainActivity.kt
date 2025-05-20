@@ -5,122 +5,106 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
+import androidx.compose.material3.Text // Mantener si se usa Text directamente en algún composable aquí
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState // <-- Importación necesaria para collectAsState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview // Mantener si se usa Preview directamente aquí
 import co.edu.unab.overa32.finanzasclaras.ui.theme.FinanzasClarasTheme
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import android.app.Activity // Necesario para (context as? Activity)?.finishAffinity()
 
-// --- Importa todas tus pantallas que uses en la navegacion ---
-import co.edu.unab.overa32.finanzasclaras.PantallaPrincipalUI
+// --- Importaciones de tus pantallas (¡Revisar que apunten a los archivos correctos!) ---
+import co.edu.unab.overa32.finanzasclaras.PantallaPrincipalUI // Asumimos que está en MainScreen.kt
+import co.edu.unab.overa32.finanzasclaras.AddGastoCompletoScreen // Asumimos que está en gastosCompletosScreen.kt (la lógica completa)
+import co.edu.unab.overa32.finanzasclaras.AddGastoScreen // Asumimos que está en gastos.kt (el esqueleto/placeholder)
 import co.edu.unab.overa32.finanzasclaras.IaScreen
-// import co.edu.unab.overa32.finanzasclaras.MainScreenWithState // Si usas esta pantalla, impórtala
 import co.edu.unab.overa32.finanzasclaras.AlertasScreen
-import co.edu.unab.overa32.finanzasclaras.AjustesScreen
-import co.edu.unab.overa32.finanzasclaras.AddGastoScreen
+import co.edu.unab.overa32.finanzasclaras.AjustesScreen // <-- ¡Importación necesaria!
 import co.edu.unab.overa32.finanzasclaras.TablaGastosScreen
-import co.edu.unab.overa32.finanzasclaras.SaldoScreen // Importa la pantalla SaldoScreen
+import co.edu.unab.overa32.finanzasclaras.SaldoScreen
 
-// Asegúrate de que tu clase SaldoDataStore esté en tu proyecto y sea accesible
-// import co.edu.unab.overa32.finanzasclaras.SaldoDataStore
-
+// --- Importaciones de DataStore y Firebase ---
+import co.edu.unab.overa32.finanzasclaras.AjustesDataStore
+import co.edu.unab.overa32.finanzasclaras.SaldoDataStore
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.FirebaseApp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge() // Habilita el diseño de borde a borde
+        enableEdgeToEdge()
+
+        FirebaseApp.initializeApp(this)
+        val db = FirebaseFirestore.getInstance()
+
         setContent {
-            FinanzasClarasTheme { // Aplica tu tema Material 3
+            val context = LocalContext.current
+
+            val ajustesDataStore = remember { AjustesDataStore(context) }
+            val saldoDataStore = remember { SaldoDataStore(context) }
+
+            val isDarkModeEnabled by ajustesDataStore.isDarkModeEnabled.collectAsState(initial = false)
+            val selectedCurrency by ajustesDataStore.selectedCurrency.collectAsState(initial = "COP")
+
+            FinanzasClarasTheme(darkTheme = isDarkModeEnabled) {
                 val myNavController = rememberNavController()
-                val myStartDestination = "main" // La pantalla principal es donde iniciamos
-                val context = LocalContext.current // Obtiene el contexto
-                // Crea la instancia de SaldoDataStore una vez en el nivel más alto de la UI
-                val saldoDataStore = remember { SaldoDataStore(context) }
+                val myStartDestination = "main"
 
-                // Observa el saldo del DataStore y actualiza el estado Compose.
-                // Cualquier cambio en el saldo guardado en DataStore actualizará esta variable.
                 val saldoTotalState by saldoDataStore.getSaldo.collectAsState(initial = 0.0)
-
 
                 NavHost(
                     navController = myNavController,
-                    startDestination = myStartDestination, // Inicia en la pantalla "main"
-                    modifier = Modifier.fillMaxSize() // El NavHost ocupa todo el espacio disponible
+                    startDestination = myStartDestination,
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    // --- Definición de Rutas (composables) ---
-
                     composable("main") {
-                        // Pasa el valor actual del saldo observado a PantallaPrincipalUI
-                        // saldoTotalState contiene el valor Double, ya no necesitas .value con 'by'
-                        PantallaPrincipalUI(saldoTotalState, myNavController)
-                    }
-
-                    composable("aiScreen") {
-                        // Pasa las lambdas necesarias. onBackClick implementa la navegación hacia atrás.
-                        IaScreen(
-                            myNavController,
-                            onBackClick = { myNavController.popBackStack() }
-                        ) { /* Lógica de la función adicional si la necesitas */ }
-                    }
-
-                    // Si "gastos" y "tablaGastos" son pantallas diferentes, mantenlas.
-                    // Si "gastos" era un nombre antiguo para "tablaGastos", considera eliminar o renombrar una.
-                    composable("gastos") {
-                        // MainScreenWithState() // Asegúrate de que esta Composable exista y sea correcta
-                        Text("Pantalla de Gastos (Placeholder/Antigua?)") // Placeholder si no la usas
-                    }
-
-                    composable("alertas") {
-                        // Pasa las lambdas necesarias. onAddAlertClick debería navegar a una pantalla para añadir alertas.
-                        AlertasScreen(
-                            myNavController,
-                            onBackClick = { myNavController.popBackStack() }, // Vuelve atrás
-                            onAddAlertClick = { /* TODO: Navegar a pantalla para añadir/editar alerta */ }
-                        ) { /* Lógica de la función adicional si la necesitas */ }
-                    }
-
-                    composable("ajustes") {
-                        // Pasa las lambdas necesarias.
-                        AjustesScreen(
-                            myNavController,
-                            onBackClick = { myNavController.popBackStack() }
-                        ) { /* Lógica de la función adicional si la necesitas */ }
-                    }
-
-                    composable("addGasto") {
-                        // Pasa la instancia de SaldoDataStore a AddGastoScreen
-                        AddGastoScreen(navController = myNavController, saldoDataStore = saldoDataStore) // <-- ¡Pasamos saldoDataStore!
-                    }
-
-                    composable("tablaGastos") {
-                        // Pasa las lambdas necesarias. onNavigateToAlertas debería navegar a la pantalla de alertas.
-                        // Asegúrate de que TablaGastosScreen pase el totalGastos si AlertasScreen lo espera.
-                        TablaGastosScreen(
-                            myNavController,
-                            onNavigateToAlertas = { totalGastos ->
-                                // Aquí puedes navegar a "alertas" y si necesitas pasar el total,
-                                // modifica la ruta "alertas" para aceptar argumentos (ej: "alertas/{total}")
-                                myNavController.navigate("alertas") // Navega a la pantalla de alertas
-                            }
+                        PantallaPrincipalUI(
+                            saldoTotal = saldoTotalState,
+                            onAddExpenseClick = { myNavController.navigate("addGastoCompleto") }, // <-- Va a la lógica COMPLETA
+                            onTablaGastosClick = { myNavController.navigate("tablaGastos") },
+                            onConfiguracionClick = { myNavController.navigate("ajustes") },
+                            onPreguntasClick = { myNavController.navigate("aiScreen") },
+                            onAddSaldoClick = { myNavController.navigate("addSaldo") },
+                            onSalirClick = { (context as? Activity)?.finishAffinity() },
+                            selectedCurrency = selectedCurrency
                         )
                     }
 
-                    // --- RUTA PARA AÑADIR SALDO ---
-                    composable("addSaldo") { // <--- Define la ruta "addSaldo"
-                        SaldoScreen(navController = myNavController) // <--- Llama a la Composable SaldoScreen
+                    composable("aiScreen") {
+                        IaScreen(myNavController, onBackClick = { myNavController.popBackStack() }) { /* Lógica adicional */ }
                     }
 
-                    // Asegúrate de que todas tus rutas importantes estén definidas aquí.
+                    composable("gastos") {
+                        // Esta ruta llama a la pantalla ESQUELETO (AddGastoScreen en gastos.kt)
+                        AddGastoScreen(navController = myNavController, saldoDataStore = saldoDataStore, selectedCurrency = selectedCurrency)
+                    }
+
+                    composable("addGastoCompleto") { // Esta ruta llama a la lógica COMPLETA (AddGastoCompletoScreen en gastosCompletosScreen.kt)
+                        AddGastoCompletoScreen(navController = myNavController, saldoDataStore = saldoDataStore, selectedCurrency = selectedCurrency)
+                    }
+
+                    composable("tablaGastos") {
+                        TablaGastosScreen(myNavController, onNavigateToAlertas = { totalGastos -> myNavController.navigate("alertas") }, selectedCurrency = selectedCurrency)
+                    }
+
+                    composable("addSaldo") {
+                        SaldoScreen(myNavController, selectedCurrency = selectedCurrency)
+                    }
+
+                    // --- ¡RUTA FALTANTE AÑADIDA! ---
+                    composable("ajustes") {
+                        AjustesScreen(myNavController, onBackClick = { myNavController.popBackStack() })
+                    }
+                    // --- FIN DE RUTA AÑADIDA ---
+
+                    // Si CategoriasScreen no existe o no se usa, comenta/elimina esta línea.
+                    // composable("categorias") { CategoriasScreen() }
                 }
             }
         }

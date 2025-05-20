@@ -1,30 +1,42 @@
-// settings.gradle.kts en la raíz de tu proyecto
+// settings.gradle.kts (en la raíz de tu proyecto)
 
 pluginManagement {
     repositories {
-        // Configuración estándar para encontrar plugins de Gradle y Android/Google
-        google() // Repositorio de Google (necesario para muchos plugins y dependencias de Android/Google)
-        mavenCentral() // Repositorio central de Maven (muchas bibliotecas open source)
-        gradlePluginPortal() // Repositorio oficial de plugins de Gradle
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    // ¡ESTE BLOQUE 'plugins' DEBE ESTAR DIRECTAMENTE AQUÍ DENTRO DE 'pluginManagement'!
+    plugins {
+        // DECLARA AQUI LOS PLUGINS QUE TUS MÓDULOS USARÁN
+        // NO USES apply(true) O apply = true AQUI
+        // Las versiones aquí DEBEN coincidir con las que usas en el build.gradle.kts de la raíz.
+        id("com.android.application") version "8.8.0" apply false // Usa la versión que tienes en el root build.gradle.kts
+        id("org.jetbrains.kotlin.android") version "1.9.23" apply false // Usa la versión que tienes en el root build.gradle.kts (1.9.23 estable)
+
+        // DECLARACIÓN DEL PLUGIN DE GOOGLE SERVICES (para Firebase)
+        id("com.google.gms.google-services") version "4.4.1" apply false // Asegúrate de que coincida con el root build.gradle.kts
+
+        // DECLARACIÓN DEL PLUGIN DE KOTLIN SERIALIZATION
+        id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23" apply false // Asegúrate de que coincida con el root build.gradle.kts
+
+        // DECLARACIÓN DEL PLUGIN DE SECRETOS DE GOOGLE AI
+        id("com.google.cloud.android.secrets-gradle-plugin") version "2.0.1" apply false // *** AÑADE ESTA LÍNEA *** - Usa la versión más reciente y apply false
     }
 }
 
+// Bloque 'dependencyResolutionManagement': Define cómo Gradle resolverá las dependencias de tus módulos.
 dependencyResolutionManagement {
-    // Esta sección configura los repositorios para las dependencias de los módulos
-    // Generalmente es buena práctica tener los mismos repositorios aquí que en pluginManagement
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS) // Fallar si un módulo usa un repositorio no declarado aquí
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS) // O RepositoriesMode.PREFER_PROJECT
     repositories {
-        google() // Repositorio de Google
-        mavenCentral() // Repositorio central de Maven
-        // Si usas otras fuentes de dependencias (ej. JitPack), las añadirías aquí
+        // Estos son los repositorios donde tus dependencias (bibliotecas como Compose, Firebase, Gemini API, etc.) serán buscadas.
+        google()
+        mavenCentral()
     }
 }
 
-// Define el nombre de tu proyecto
-rootProject.name = "Finanzas Claras" // Asegurate de que este sea el nombre correcto de tu proyecto
+rootProject.name = "Finanzas Claras" // Asegúrate de que este sea el nombre correcto de tu proyecto.
 
-// Incluye los módulos de tu proyecto (normalmente solo :app al inicio)
-include(":app")
+include(":app") // Declara tus módulos aquí.
 
-// Si tienes otros módulos (ej. :feature:ia), los añadirías aquí:
-// include(":feature:ia")
+// ... (No debería haber más código relevante aquí para la mayoría de los proyectos)

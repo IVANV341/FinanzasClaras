@@ -1,4 +1,4 @@
-package co.edu.unab.overa32.finanzasclaras // Reemplaza con tu paquete
+/*package co.edu.unab.overa32.finanzasclaras // Reemplaza con tu paquete
 
 import com.google.ai.client.generativeai.GenerativeModel // <-- Importación clave para usar Gemini
 import com.google.ai.client.generativeai.extras.countTokens
@@ -7,11 +7,13 @@ import com.google.ai.client.generativeai.type.GenerateContentResponse
 // Importaciones para manejar posibles errores de la API (deberían resolverse si la dependencia está bien)
 import com.google.ai.client.generativeai.type.SerializationException
 import com.google.ai.client.generativeai.type.GoogleGenerativeAIException
+//import co.edu.unab.overa32.finanzasclaras.BuildConfig
 
 
 // Asegúrate de que BuildConfig esté accesible para obtener la API Key
 // La línea de importación de BuildConfig DEBE estar descomentada y apuntar al paquete correcto
-import co.edu.unab.overa32.finanzasclaras.BuildConfig
+// COMÉNTALA O ELIMÍNALA TEMPORALMENTE:
+// import co.edu.unab.overa32.finanzasclaras.BuildConfig
 
 
 // Esta clase se encargará de la comunicación con el modelo de IA
@@ -23,7 +25,9 @@ class IaRepository { // <-- Nombre de la clase corregido a IaRepository
     // Verifica los modelos disponibles en la documentación de Google AI.
     private val generativeModel = GenerativeModel(
         modelName = "gemini-1.5-flash-latest", // Nombre del modelo a usar
-        apiKey = BuildConfig.GEMINI_API_KEY // Obtenemos la API Key del BuildConfig generado por el plugin
+        // *** AQUÍ ES DONDE LO CAMBIAS ***
+        // Reemplaza "BuildConfig.GEMINI_API_KEY" por tu clave API real entre comillas dobles.
+        apiKey = "TU_CLAVE_API_DE_GEMINI_AQUI" // ¡¡¡ADVERTENCIA: NO HACER ESTO EN PRODUCCIÓN!!!
     )
 
     // Función suspendida para enviar un mensaje de texto al modelo y obtener una respuesta.
@@ -70,3 +74,5 @@ class IaRepository { // <-- Nombre de la clase corregido a IaRepository
     // Luego usarías chat.sendMessage(content { text(...) })
     */
 }
+
+ */

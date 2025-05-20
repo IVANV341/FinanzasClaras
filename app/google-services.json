@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "533809737453",
+    "project_id": "finanzas-claras-5e170",
+    "storage_bucket": "finanzas-claras-5e170.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:533809737453:android:ced89122a2f72bdf7ee6e4",
+        "android_client_info": {
+          "package_name": "co.edu.unab.overa32.finanzasclaras"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYR6HfWI6nJ4Sgf6EUWas9gydIBLkTYyc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

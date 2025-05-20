@@ -1,5 +1,11 @@
 package co.edu.unab.overa32.finanzasclaras
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,107 +14,256 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material3.* // Usamos Material 3 components
+import androidx.compose.material3.*
 import androidx.compose.runtime.* // Para remember, mutableStateOf, etc.
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview // <-- Importación para @Preview
+import androidx.compose.ui.platform.LocalContext // Todavía necesario para obtener el Context en el Composable superior
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController // <-- Importación para rememberNavController
-import androidx.compose.material3.MaterialTheme // <-- Importación para envolver el preview
+import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
+
+// Importaciones para AlertDialog, TextButton, FilledTonalButton, OutlinedTextField
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedTextField
 
 
 // --- 1. Clase Sellada para Representar Tipos de Items de Ajustes ---
-// Esto nos ayuda a tener diferentes tipos de filas en nuestra lista
 sealed class SettingsItem {
-    data class Header(val title: String) : SettingsItem() // Un encabezado de sección
-    // Un item clickeable (para navegación o acción), puede tener descripción
-    data class ClickableItem(val id: String, val title: String, val description: String? = null, val onClick: () -> Unit) : SettingsItem()
-    // Un item con un interruptor (toggle)
-    data class ToggleItem(val id: String, val title: String, val description: String? = null, val isEnabled: Boolean, val onToggle: (Boolean) -> Unit) : SettingsItem()
-    // Podrías añadir otros tipos si necesitas (ej: TextInputItem)
+    data class Header(val title: String) : SettingsItem()
+    data class ClickableItem(val id: String, val title: String, val description: String? = null, val onClick: (Context) -> Unit) : SettingsItem()
+    data class ToggleItem(val id: String, val title: String, val description: String? = null) : SettingsItem()
+    data class DialogItem(val id: String, val title: String, val description: String? = null, val onDialogRequested: () -> Unit) : SettingsItem()
 }
 
-// --- 2. Datos de Ejemplo para la Lista de Ajustes ---
-// En una app real, el estado de ToggleItem vendría de tu ViewModel/estado central
-val sampleSettingsList: List<SettingsItem> = listOf(
-    SettingsItem.Header("General"),
-    SettingsItem.ClickableItem("currency", "Cambiar Moneda", "COP - Peso Colombiano", onClick = { /* TODO: Navegar a cambiar moneda */ }),
-    SettingsItem.ClickableItem("language", "Idioma", "Español", onClick = { /* TODO: Navegar a cambiar idioma */ }),
-
-    SettingsItem.Header("Notificaciones"),
-    // Ejemplo de ToggleItem con estado mutable local solo para el preview
-    SettingsItem.ToggleItem("expense_alerts", "Recibir Alertas de Gastos", isEnabled = true, onToggle = { isEnabled ->
-        // TODO: Implementar lógica para guardar el estado de la alerta (ej. en SharedPreferences, ViewModel)
-        println("Recibir Alertas cambiado a: $isEnabled")
-    }),
-    SettingsItem.ClickableItem("notification_sound", "Sonido de Notificación", onClick = { /* TODO: Navegar a ajustes de sonido */ }),
-
-    SettingsItem.Header("Apariencia"),
-    SettingsItem.ToggleItem("dark_mode", "Modo Oscuro", isEnabled = false, onToggle = { isEnabled ->
-        // TODO: Implementar lógica para cambiar el tema de la app
-        println("Modo Oscuro cambiado a: $isEnabled")
-    }),
-
-    SettingsItem.Header("Cuenta"),
-    SettingsItem.ClickableItem("edit_profile", "Editar Perfil", onClick = { /* TODO: Navegar a editar perfil */ }),
-    SettingsItem.ClickableItem("logout", "Cerrar Sesión", onClick = { /* TODO: Implementar cerrar sesión */ }), // Podrías darle un estilo diferente
-
-    SettingsItem.Header("Acerca de"),
-    // Un item clickeable sin acción, solo para mostrar info (la descripción es el valor)
-    SettingsItem.ClickableItem("app_version", "Versión de la Aplicación", "1.0.0", onClick = { /* Opcional: Mostrar diálogo de detalles */ }),
-    SettingsItem.ClickableItem("terms", "Términos y Condiciones", onClick = { /* TODO: Abrir URL o navegar a pantalla */ }),
-    SettingsItem.ClickableItem("privacy", "Política de Privacidad", onClick = { /* TODO: Abrir URL o navegar a pantalla */ })
-)
-
-// --- 3. Composable de la Pantalla de Ajustes ---
-@OptIn(ExperimentalMaterial3Api::class) // Para TopAppBar
+// --- 2. Composable de la Pantalla de Ajustes ---
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AjustesScreen(
     myNavController: NavHostController,
-    onBackClick: () -> Unit, // Acción para el botón de volver
-    function: () -> Unit // <-- Función adicional que recibe
+    onBackClick: () -> Unit,
 ) {
+    // Obtenemos el contexto aquí, UNA SOLA VEZ en el Composable superior.
+    val currentContext = LocalContext.current
+
+    // Instancia de AjustesDataStore, la obtenemos aquí.
+    val ajustesDataStore = remember { AjustesDataStore(currentContext) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Estados observados de AjustesDataStore
+    val isDarkModeEnabled by ajustesDataStore.isDarkModeEnabled.collectAsState(initial = false)
+    val selectedCurrency by ajustesDataStore.selectedCurrency.collectAsState(initial = "COP")
+    val userName by ajustesDataStore.userName.collectAsState(initial = "Usuario")
+
+    // --- Estados para controlar la visibilidad de los diálogos ---
+    var showCurrencyDialog by remember { mutableStateOf(false) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var newUserNameInput by remember { mutableStateOf(userName) }
+
+    // --- Activity Result Launcher para el selector de sonido del sistema ---
+    val ringtonePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.data != null) {
+            val uri: Uri? = result.data?.getParcelableExtra(Settings.ACTION_SOUND_SETTINGS)
+            // Lógica para guardar la URI si es necesario (ej. en AjustesDataStore)
+        }
+    }
+
+    // --- Lista de Ajustes Dinámica (Recomponer cuando cambien los estados de DataStore) ---
+    val settingsList: List<SettingsItem> = remember(
+        isDarkModeEnabled, selectedCurrency, userName
+    ) {
+        listOf(
+            SettingsItem.Header("General"),
+            SettingsItem.DialogItem(
+                id = "currency",
+                title = "Cambiar Moneda",
+                description = selectedCurrency,
+                onDialogRequested = { showCurrencyDialog = true }
+            ),
+            SettingsItem.ClickableItem(
+                id = "language",
+                title = "Idioma",
+                description = "Español",
+                onClick = { context -> /* No hace nada en este ejemplo, podría navegar o abrir un selector */ }
+            ),
+
+            SettingsItem.Header("Notificaciones"),
+            // ToggleItem para alertas de gastos (este también lo pasaremos a ToggleSettingItem)
+            SettingsItem.ToggleItem(
+                id = "expense_alerts",
+                title = "Recibir Alertas de Gastos",
+                description = if (true) "Activado" else "Desactivado" // Puedes vincular esto a DataStore también
+            ),
+            SettingsItem.ClickableItem(
+                id = "notification_sound",
+                title = "Sonido de Notificación",
+                onClick = { context ->
+                    val intent = Intent(Settings.ACTION_SOUND_SETTINGS)
+                    ringtonePickerLauncher.launch(intent)
+                }
+            ),
+
+            SettingsItem.Header("Apariencia"),
+            // ToggleItem para Modo Oscuro
+            SettingsItem.ToggleItem(
+                id = "dark_mode",
+                title = "Modo Oscuro",
+                description = if (isDarkModeEnabled) "Activado" else "Desactivado"
+            ),
+
+            SettingsItem.Header("Cuenta"),
+            SettingsItem.DialogItem(
+                id = "edit_profile",
+                title = "Editar Perfil",
+                description = userName,
+                onDialogRequested = {
+                    newUserNameInput = userName
+                    showEditProfileDialog = true
+                }
+            ),
+
+            SettingsItem.Header("Acerca de"),
+            SettingsItem.ClickableItem(
+                id = "app_version",
+                title = "Versión de la Aplicación",
+                description = "1.0.0",
+                onClick = { context -> /* Opcional: Mostrar un diálogo de información */ }
+            ),
+            SettingsItem.ClickableItem(
+                id = "terms",
+                title = "Términos y Condiciones",
+                onClick = { context ->
+                    val url = "https://www.google.com/policies/terms/"
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    context.startActivity(intent)
+                }
+            ),
+            SettingsItem.ClickableItem(
+                id = "privacy",
+                title = "Política de Privacidad",
+                onClick = { context ->
+                    val url = "https://www.google.com/policies/privacy/"
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    context.startActivity(intent)
+                }
+            )
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ajustes", color = MaterialTheme.colorScheme.onSurface) }, // Color de texto desde el tema
+                title = { Text("Ajustes", color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) { // Usa la lambda onBackClick
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.onSurface) // Color de icono desde el tema
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                // Puedes añadir acciones aquí si es necesario (ej: buscar ajustes)
-                // actions = { IconButton(...) { Icon(...) } }
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface) // Color de fondo de la barra desde el tema
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { paddingValues ->
-        // Usamos LazyColumn para la lista de ajustes, eficiente para listas largas
         LazyColumn(
             modifier = Modifier
-                .padding(paddingValues) // Aplica el padding del Scaffold
+                .padding(paddingValues)
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background) // Color de fondo general desde el tema
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // items es un builder que nos permite manejar diferentes tipos de elementos
-            items(sampleSettingsList) { item ->
+            items(settingsList) { item ->
                 when (item) {
                     is SettingsItem.Header -> SettingsHeader(title = item.title)
-                    is SettingsItem.ClickableItem -> ClickableSettingItem(item = item)
-                    is SettingsItem.ToggleItem -> ToggleSettingItem(item = item)
+                    is SettingsItem.ClickableItem -> ClickableSettingItem(item = item, context = currentContext)
+                    // ¡PASAMOS EL CONTEXTO Y EL AJUSTESDATASTORE A TOGGLESETTINGITEM!
+                    is SettingsItem.ToggleItem -> ToggleSettingItem(
+                        item = item,
+                        context = currentContext, // Pasa el contexto
+                        ajustesDataStore = ajustesDataStore,
+                        isDarkModeActive = isDarkModeEnabled
+                    )
+                    is SettingsItem.DialogItem -> DialogSettingItem(item = item)
                 }
-                // Opcional: Añadir un Divider después de cada item (excepto headers)
-                // if (item !is SettingsItem.Header) {
-                //     Divider(color = Color.LightGray, thickness = 0.5.dp)
-                // }
             }
         }
     }
-    // Aunque 'function' no se usa visualmente en la UI, se recibe como parámetro.
-    // Si se necesitara que hiciera algo en respuesta a un evento de UI, se llamaría aquí.
-    // Por ejemplo, si un botón llamara a `function()`.
+
+    // --- Diálogo para Cambiar Moneda ---
+    if (showCurrencyDialog) {
+        AlertDialog(
+            onDismissRequest = { showCurrencyDialog = false },
+            title = { Text("Seleccionar Moneda") },
+            text = {
+                Column {
+                    val currencies = listOf("COP", "USD", "EUR")
+                    currencies.forEach { currency ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    coroutineScope.launch {
+                                        ajustesDataStore.setSelectedCurrency(currency)
+                                        showCurrencyDialog = false
+                                    }
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = (currency == selectedCurrency),
+                                onClick = null
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(currency)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCurrencyDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // --- Diálogo para Editar Perfil ---
+    if (showEditProfileDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditProfileDialog = false },
+            title = { Text("Editar Perfil") },
+            text = {
+                OutlinedTextField(
+                    value = newUserNameInput,
+                    onValueChange = { newUserNameInput = it },
+                    label = { Text("Tu Nombre") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                FilledTonalButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            ajustesDataStore.setUserName(newUserNameInput)
+                            showEditProfileDialog = false
+                        }
+                    }
+                ) {
+                    Text("Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditProfileDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 // --- 4. Composable para un Encabezado de Sección ---
@@ -116,87 +271,123 @@ fun AjustesScreen(
 fun SettingsHeader(title: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleSmall, // Estilo de texto para encabezados (ajusta según tu tema)
-        color = MaterialTheme.colorScheme.primary, // Color primario para los encabezados
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp) // Padding
-            .padding(top = 16.dp) // Espacio adicional arriba del primer encabezado de una sección
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(top = 16.dp)
     )
 }
 
 // --- 5. Composable para un Item de Ajuste Clickeable ---
 @Composable
-fun ClickableSettingItem(item: SettingsItem.ClickableItem) {
+fun ClickableSettingItem(item: SettingsItem.ClickableItem, context: Context) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = item.onClick) // Hace toda la fila clickeable
-            .padding(horizontal = 16.dp, vertical = 12.dp), // Padding interno del item
+            .clickable(onClick = { item.onClick(context) })
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween // Distribuye el espacio
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column(
-            modifier = Modifier.weight(1f) // Ocupa la mayor parte del espacio
+            modifier = Modifier.weight(1f)
         ) {
             Text(
                 text = item.title,
-                style = MaterialTheme.typography.bodyLarge, // Estilo de texto para títulos de items
-                color = MaterialTheme.colorScheme.onSurface // Color de texto principal del tema
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
             )
-            item.description?.let { description -> // Si hay descripción, la muestra
+            item.description?.let { description ->
                 Text(
                     text = description,
-                    style = MaterialTheme.typography.bodySmall, // Estilo de texto más pequeño para descripción
-                    color = MaterialTheme.colorScheme.onSurfaceVariant // Color de texto secundario del tema
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        // Ícono de flecha si es clickeable y lleva a otra pantalla (opcional)
-        // Excluimos el item "app_version" y el item "logout" de mostrar la flecha típicamente
-        if (item.id != "app_version" && item.id != "logout") {
+        if (item.id != "app_version") {
             Icon(
-                Icons.AutoMirrored.Filled.ArrowForward, // Ícono de flecha
-                contentDescription = null, // No necesita descripción para accesibilidad si es solo visual
-                tint = MaterialTheme.colorScheme.onSurfaceVariant // Color del icono
-            )
-        }
-        // Si es el item de Logout, podrías darle un color diferente al texto (ej. rojo)
-        // Aquí solo cambiamos el color del texto del título para el logout
-        if (item.id == "logout") {
-            Text(
-                text = item.title, // Repetimos el texto del título
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error // Color de error para indicar acción destructiva
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
-    // Añadimos un Divider después de cada item clickeable
     Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
 }
 
-// --- 6. Composable para un Item de Ajuste con Interruptor ---
+// --- NUEVO: Composable para un Item que dispara un Diálogo ---
 @Composable
-fun ToggleSettingItem(item: SettingsItem.ToggleItem) {
-    // Estado local para el switch. En una app real, este estado vendría de un ViewModel
-    // o se manejaría directamente en la lambda onToggle para actualizar el estado externo.
-    // Para el preview, el estado local 'isChecked' funciona bien.
-    var isChecked by remember { mutableStateOf(item.isEnabled) }
+fun DialogSettingItem(item: SettingsItem.DialogItem) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = item.onDialogRequested)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            item.description?.let { description ->
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.ArrowForward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
+}
+
+
+// --- 6. Composable para un Item de Ajuste con Interruptor (MODIFICADO para usar el Context pasado y AjustesDataStore) ---
+@Composable
+fun ToggleSettingItem(item: SettingsItem.ToggleItem, context: Context, ajustesDataStore: AjustesDataStore, isDarkModeActive: Boolean) {
+    val coroutineScope = rememberCoroutineScope()
+
+    // Las SharedPreferences también se recuerdan usando el contexto pasado, NO LocalContext.current
+    val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+
+    val currentCheckedState = if (item.id == "dark_mode") isDarkModeActive else {
+        prefs.getBoolean(item.id, false)
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = { // Hace la fila clickeable y alterna el switch
-                isChecked = !isChecked // Alterna el estado local
-                item.onToggle(isChecked) // Llama a la lambda para notificar al exterior
+            .clickable(onClick = {
+                coroutineScope.launch {
+                    if (item.id == "dark_mode") {
+                        ajustesDataStore.setDarkModeEnabled(!isDarkModeActive)
+                    } else {
+                        val newChecked = !prefs.getBoolean(item.id, false)
+                        prefs.edit().putBoolean(item.id, newChecked).apply()
+                        println("Toggle ${item.title} cambiado a: $newChecked (guardado en SharedPreferences)")
+                    }
+                }
             })
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column(
-            modifier = Modifier.weight(1f).padding(end = 16.dp) // Espacio al final de la columna de texto
+            modifier = Modifier.weight(1f).padding(end = 16.dp)
         ) {
             Text(
                 text = item.title,
@@ -213,90 +404,32 @@ fun ToggleSettingItem(item: SettingsItem.ToggleItem) {
         }
 
         Switch(
-            checked = isChecked, // Usa el estado local
+            checked = currentCheckedState,
             onCheckedChange = { enabled ->
-                isChecked = enabled // Actualiza el estado local
-                item.onToggle(enabled) // Llama a la lambda para notificar al exterior
+                coroutineScope.launch {
+                    if (item.id == "dark_mode") {
+                        ajustesDataStore.setDarkModeEnabled(enabled)
+                    } else {
+                        prefs.edit().putBoolean(item.id, enabled).apply()
+                        println("Toggle ${item.title} cambiado a: $enabled (guardado en SharedPreferences)")
+                    }
+                }
             },
-            // Puedes personalizar los colores del Switch aquí si no te gustan los del tema
-            // colors = SwitchDefaults.colors(...) // Descomenta y configura si necesitas colores específicos
         )
     }
-    // Añadimos un Divider después de cada item con interruptor
     Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
 }
 
 
 // --- Función @Preview para AjustesScreen ---
-// Esta función va DESPUÉS de la definición de AjustesScreen.
 @Preview(showBackground = true, showSystemUi = true, name = "Ajustes Screen Preview")
 @Composable
 fun AjustesScreenPreview() {
-    // Aquí proporcionamos el entorno necesario para que el preview funcione.
-    // Es crucial envolverlo en MaterialTheme para que los colores y la tipografía del tema se apliquen.
-    MaterialTheme { // Envuelve con el tema Material 3 (o tu tema personalizado)
-        // Creamos un NavController de prueba. No navega, solo permite que el código compile.
+    MaterialTheme {
         val navController = rememberNavController()
-
-        // Proporcionamos lambdas de prueba para las acciones de clic y la función adicional
-        val previewOnBackClick: () -> Unit = {
-            println("Preview: Botón Volver clickeado") // Puedes poner un log
-        }
-        val previewFunction: () -> Unit = {
-            println("Preview: Función adicional llamada") // Puedes poner un log
-        }
-
-        // Llama a la Composable que queremos previsualizar
         AjustesScreen(
-            myNavController = navController as NavHostController, // Casteo necesario para NavHostController
-            onBackClick = previewOnBackClick,
-            function = previewFunction // Pasa la lambda de prueba para 'function'
-            // Nota: Los lambdas onClick y onToggle dentro de sampleSettingsList
-            // también funcionarán en el preview imprimiendo mensajes.
+            myNavController = navController,
+            onBackClick = { println("Preview: Botón Volver clickeado") },
         )
     }
 }
-
-
-// --- Cómo integrar en tu MainActivity ---
-/*
-package co.edu.unab.overa32.finanzasclaras // Tu paquete
-
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-// Importa tu tema y las pantallas necesarias
-import co.edu.unab.overa32.finanzasclaras.ui.theme.FinanzasClarasTheme
-// Importa las pantallas que necesites: AjustesScreen, PantallaPrincipalUI, etc.
-
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            FinanzasClarasTheme { // Aplica tu tema
-                val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = "mainScreen") {
-                    composable("mainScreen") {
-                        // Aquí llamas a PantallaPrincipalUI con los parámetros correctos
-                        // PantallaPrincipalUI(saldoTotal = ..., navController = navController)
-                    }
-                    composable("ajustes") { // Define la ruta para esta pantalla
-                         AjustesScreen(
-                            myNavController = navController, // Pasas el controlador real
-                            onBackClick = { navController.popBackStack() }, // Implementa la navegación real hacia atrás
-                             function = { /* Implementa la lógica real de esta función si es necesaria */ }
-                             // En una app real, los lambdas onClick y onToggle en la lista de ajustes
-                             // llamarían a funciones en un ViewModel para actualizar el estado o navegar.
-                        )
-                    }
-                    // Define otras rutas (tablaGastos, addGasto, addSaldo, aiScreen, alertasScreen)
-                }
-            }
-        }
-    }
-}
-*/

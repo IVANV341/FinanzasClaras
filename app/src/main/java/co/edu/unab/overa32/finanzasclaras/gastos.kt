@@ -1,178 +1,75 @@
 package co.edu.unab.overa32.finanzasclaras // Reemplaza con tu paquete
 
-import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.* // Usamos Material 3 components
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview // <-- Importación para @Preview!
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController // <-- Importación para el Preview!
-import androidx.compose.material3.MaterialTheme // <-- Importación para envolver el preview!
+import co.edu.unab.overa32.finanzasclaras.SaldoDataStore // Necesario si AddGastoScreen interactúa con el saldo
+import androidx.compose.runtime.remember // Para el remember de SaldoDataStore en el preview
+import androidx.compose.ui.platform.LocalContext // Para LocalContext en el preview
 
-// Necesarias para Coroutines y DataStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.first // <-- Importación para obtener el primer valor del Flow
-import kotlinx.coroutines.flow.flowOf // <-- Importación para flowOf en el mock del Preview
-
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-
-// Asegúrate de que tu clase SaldoDataStore esté importada o en el mismo paquete
-// import co.edu.unab.overa32.finanzasclaras.SaldoDataStore
-
+// ESTE ARCHIVO AHORA CONTIENE LA PANTALLA 'AddGastoScreen' (el esqueleto/placeholder).
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddGastoScreen(navController: NavController, saldoDataStore: SaldoDataStore){ // <-- Recibe SaldoDataStore
-    val context = LocalContext.current
-
-    var descripcion by remember { mutableStateOf("") }
-    var monto by remember { mutableStateOf("") }
-
+// Esta es la AddGastoScreen que actúa como esqueleto.
+fun AddGastoScreen(navController: NavController, saldoDataStore: SaldoDataStore, selectedCurrency: String) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Añadir Gasto") },
+                title = { Text("Añadir Nuevo Gasto (Esqueleto)", color = MaterialTheme.colorScheme.onPrimary) }, // Título para distinguirlo
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("Añadir Gasto", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = descripcion,
-                onValueChange = { descripcion = it },
-                label = { Text("Descripción") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = monto,
-                onValueChange = { monto = it },
-                label = { Text("Monto") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = {
-                    val montoDouble = monto.toDoubleOrNull()
-                    if (montoDouble != null && montoDouble > 0 && descripcion.isNotBlank()) {
-                        val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-                        // --- Cambiamos el formato y nombre del archivo ---
-                        val lineaMovimiento = "gasto|$descripcion|$montoDouble|$currentDate\n" // Añadimos el tipo "gasto" y salto de línea
-                        val file = File(context.filesDir, "movimientos.txt") // <-- Nombre del archivo cambiado
-
-                        // --- Lógica para guardar el movimiento y actualizar el saldo ---
-                        CoroutineScope(Dispatchers.IO).launch {
-                            // 1. Guardar el movimiento en el archivo común
-                            file.appendText(lineaMovimiento) // Usa appendText, maneja si el archivo existe o no
-
-                            // 2. Leer el saldo actual del DataStore
-                            val saldoActual = saldoDataStore.getSaldo.first()
-
-                            // 3. Restarle el monto del gasto
-                            val nuevoSaldoTotal = saldoActual - montoDouble
-
-                            // 4. Guardar el nuevo saldo total en el DataStore
-                            saldoDataStore.saveSaldo(nuevoSaldoTotal)
-
-                            // Mostrar mensaje de éxito y volver a la pantalla anterior (en el hilo principal)
-                            launch(Dispatchers.Main) {
-                                Toast.makeText(context, "Gasto registrado y saldo actualizado", Toast.LENGTH_SHORT).show()
-                                navController.popBackStack()
-                            }
-                        }
-
-                    } else {
-                        val errorMessage = if (montoDouble == null || montoDouble <= 0) {
-                            "Por favor ingresa un monto válido mayor a cero."
-                        } else {
-                            "Por favor completa la descripción."
-                        }
-                        Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1976D2), // Azul
-                    contentColor = Color.White
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Guardar Gasto")
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Aquí iría la interfaz para añadir un nuevo gasto. (Moneda: $selectedCurrency)",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = { navController.popBackStack() }) {
+                Text("Volver")
             }
         }
     }
 }
 
-// --- Función @Preview para AddGastoScreen ---
-@Preview(showBackground = true, showSystemUi = true, name = "Add Gasto Screen Preview")
+// --- Preview de AddGastoScreen (Esqueleto) ---
+@Preview(showBackground = true, showSystemUi = true, name = "Añadir Gasto Esqueleto Preview") // Nombre de preview para distinguirlo
 @Composable
-fun AddGastoScreenPreview() {
+fun AddGastoScreenPreview() { // Este preview estará en gastos.kt
     MaterialTheme {
         val navController = rememberNavController()
-        val previewContext = LocalContext.current
+        val context = LocalContext.current
+        val saldoDataStore = remember { SaldoDataStore(context) }
 
-        // Creamos un mock simple de SaldoDataStore para el preview.
-        // Asumimos que getSaldo y saveSaldo son 'open' en SaldoDataStore.
-        val mockSaldoDataStore = remember {
-            object : SaldoDataStore(previewContext) {
-                override val getSaldo: kotlinx.coroutines.flow.Flow<Double> = kotlinx.coroutines.flow.flowOf(1000000.0)
-                override suspend fun saveSaldo(saldo: Double) {
-                    println("Preview Mock: Intentando guardar saldo $saldo")
-                }
-            }
-        }
-        // Llama a la Composable que queremos previsualizar, pasando el mock
-        AddGastoScreen(navController = navController, saldoDataStore = mockSaldoDataStore)
+        AddGastoScreen(
+            navController = navController,
+            saldoDataStore = saldoDataStore,
+            selectedCurrency = "COP" // Puedes cambiar esto para ver el preview con otra moneda
+        )
     }
 }
