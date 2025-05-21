@@ -3,12 +3,10 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    // ¡AÑADE ESTE PLUGIN DE GOOGLE SERVICES!
-    id("com.google.gms.google-services") // ¡AÑADIDO!
-
-    // Asegúrate de que la versión de serialization coincida con la del root build.gradle.kts
-    // La versión del plugin aquí NO se especifica, se define en el root build.gradle.kts
+    id("com.google.gms.google-services")
     id("org.jetbrains.kotlin.plugin.serialization")
+
+    id("kotlin-kapt")
 }
 
 android {
@@ -59,7 +57,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
     // DataStore
-    implementation("androidx.datastore:datastore-preferences:1.0.0") // Esta es la correcta para DataStore
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 
     // Core KTX, Lifecycle Runtime KTX, Activity Compose
     implementation("androidx.core:core-ktx:1.13.1")
@@ -75,11 +73,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
 
-
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.05.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
@@ -98,5 +94,10 @@ dependencies {
     // Firebase (si usas Firebase)
     implementation(platform("com.google.firebase:firebase-bom:32.8.1"))
     implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("com.google.firebase:firebase-auth-ktx") // Si usas autenticación
+    implementation("androidx.core:core-ktx:1.13.1") // O la versión más reciente compatible
+    // --- ¡NUEVO! Dependencias de Room ---
+    val room_version = "2.6.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    kapt("androidx.room:room-compiler:$room_version") // <-- Aquí debe ser 'kapt'
+    implementation("androidx.room:room-ktx:$room_version")
 }

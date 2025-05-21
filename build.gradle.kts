@@ -4,16 +4,18 @@
 // Es CRÍTICO que este bloque vaya al PRINCIPIO del archivo.
 plugins {
     // Android Gradle Plugin (AGP) - Versión del plugin de Android
-    id("com.android.application") version "8.8.0" apply false // Usas la versión 8.8.0
+    id("com.android.application") version "8.8.0" apply false
 
     // Kotlin Android Plugin - Versión del compilador de Kotlin para Android
-    id("org.jetbrains.kotlin.android") version "1.9.23" apply false // Versión de Kotlin estable
+    id("org.jetbrains.kotlin.android") version "1.9.23" apply false
 
     // Google Services Plugin - Para Firebase (procesa google-services.json)
-    id("com.google.gms.google-services") version "4.4.1" apply false // Última versión estable de gms-google-services
+    id("com.google.gms.google-services") version "4.4.1" apply false
 
     // Kotlin Serialization Plugin - Para usar kotlinx.serialization
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23" apply false // Misma versión que Kotlin
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23" apply false
+
+    // ¡NUEVO! AÑADE ESTA LÍNEA PARA KSP
 }
 
 // Nota: Con las versiones modernas de Gradle y Kotlin DSL, los bloques 'buildscript'

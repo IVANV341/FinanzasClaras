@@ -6,27 +6,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.* // Usamos Material 3 components
-import androidx.compose.runtime.* // Para remember y mutableStateOf
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview // <-- Importación para @Preview
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController // <-- Importación para rememberNavController
-import androidx.compose.material3.MaterialTheme // <-- Importación para envolver el preview
-import java.text.NumberFormat // Para formatear el saldo como moneda
-import java.util.Locale // Para especificar la localización del formato
+import androidx.navigation.compose.rememberNavController
+import androidx.compose.material3.MaterialTheme
+import java.text.NumberFormat
+import java.util.Locale
 
+// IMPORTS NECESARIOS
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
+
+// (Mantén tus clases de datos AlertThreshold y definiciones de colores)
 // --- 1. Clase de Datos para un Umbral de Alerta ---
-data class AlertThreshold(
-    val id: Long, // Identificador único
-    val amount: Double, // Monto del umbral
-    val isEnabled: Boolean // Si la alerta está activa
-)
+
 
 // --- 2. Definiciones de Colores (Aproximados a la imagen) ---
 val PurpleBackground = Color(0xFF673AB7) // Un púrpura para el fondo
@@ -38,236 +40,196 @@ val TextColorGray = Color.Gray // Texto gris secundario (si se usa)
 
 
 // --- 3. Composable de la Pantalla de Alertas ---
-@OptIn(ExperimentalMaterial3Api::class) // Para TopAppBar
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlertasScreen(
-    myNavController: NavHostController,
-    onBackClick: () -> Unit, // Acción para el botón de volver
-    onAddAlertClick: () -> Unit, // Acción para el botón "+" de añadir alerta
-    function: () -> Unit // <-- Función adicional que recibe
+    myNavController: NavHostController, // Warning: Parameter 'myNavController' is never used - lo dejaremos para mantener la firma
+    onBackClick: () -> Unit,
+    onAddAlertClick: () -> Unit,
+    function: () -> Unit, // Warning: Parameter 'function' is never used - lo dejaremos para mantener la firma
+    // INYECTA EL VIEWMODEL CON TODAS LAS DEPENDENCIAS REQUERIDAS POR EL FACTORY
+    alertsViewModel: AlertsViewModel = viewModel(
+        factory = AlertsViewModelFactory(
+            saldoDataStore = SaldoDataStore(LocalContext.current),
+            alertThresholdsRepository = AlertThresholdsRepository(AppDatabase.getDatabase(LocalContext.current).alertThresholdDao()),
+            applicationContext = LocalContext.current.applicationContext // ¡CORREGIDO Y COMPLETO!
+        )
+    )
 ) {
+    // Observa el estado de la UI desde el ViewModel
+    val uiState by alertsViewModel.uiState.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Alertas", color = TextColorWhite) }, // Título blanco
+                title = { Text("Alertas", color = TextColorWhite) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) { // Usa la lambda onBackClick
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = TextColorWhite) // Icono blanco
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = TextColorWhite)
                     }
                 },
                 actions = {
-                    // Botón "+" para añadir nueva alerta
-                    IconButton(onClick = onAddAlertClick) { // Usa la lambda onAddAlertClick
-                        Icon(Icons.Filled.Add, contentDescription = "Añadir Alerta", tint = TextColorWhite) // Icono blanco
+                    IconButton(onClick = onAddAlertClick) {
+                        Icon(Icons.Filled.Add, contentDescription = "Añadir Alerta", tint = TextColorWhite)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PurpleBackground) // Fondo púrpura para la barra superior
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = PurpleBackground)
             )
         }
     ) { paddingValues ->
-        // Contenido principal de la pantalla
         Column(
             modifier = Modifier
-                .padding(paddingValues) // Aplica el padding del Scaffold
+                .padding(paddingValues)
                 .fillMaxSize()
-                .background(PurpleBackground) // Fondo púrpura para el contenido
-                .padding(horizontal = 16.dp, vertical = 24.dp), // Padding alrededor del contenido
+                .background(PurpleBackground)
+                .padding(horizontal = 16.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp) // Espacio entre los elementos principales
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // --- Lista de Umbrales de Alerta ---
-            // Usamos los datos de ejemplo para el preview:
+            // --- Mensajes de estado ---
+            if (uiState.isLoading) {
+                CircularProgressIndicator(color = TextColorWhite)
+            } else if (uiState.errorMessage != null) {
+                Text("Error: ${uiState.errorMessage}", color = Color.Red)
+            }
+
+            // --- Lista de Umbrales de Alerta (Ahora desde el ViewModel) ---
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp) // Espacio entre los umbrales individuales
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                sampleAlertThresholds.forEach { alert ->
-                    AlertThresholdItem(alert = alert)
+                if (uiState.umbralesAlerta.isEmpty() && !uiState.isLoading) {
+                    Text("No hay alertas configuradas.", color = TextColorWhite, fontSize = 16.sp)
+                } else {
+                    uiState.umbralesAlerta.forEach { alert ->
+                        AlertThresholdItem(
+                            alert = alert,
+                            onToggleEnabled = { id, enabled ->
+                                alertsViewModel.toggleAlertThreshold(id, enabled) // Conecta el switch al ViewModel
+                            }
+                        )
+                    }
                 }
             }
 
-            // --- Espacio para separar umbrales y saldos ---
-            Spacer(Modifier.height(32.dp)) // Espacio mayor
+            Spacer(Modifier.height(32.dp))
 
-            // --- Sección de Saldo Total ---
-            SaldoDisplayCard(label = "saldo total:", amount = 15400000.00) // Usa la función auxiliar
+            // --- Sección de Saldo Total (Ajustado para tomar del ViewModel) ---
+            // Asumo que el saldo total es el mismo que el saldo actual para esta pantalla
+            SaldoDisplayCard(label = "saldo total:", amount = uiState.saldoActual)
 
-            // --- Sección de Saldo Actual ---
-            SaldoDisplayCard(label = "saldo actual", amount = 1500000.00) // Usa la misma función
-
-            // Si hubiera espacio restante, puedes empujar los elementos hacia arriba
-            // Spacer(Modifier.weight(1f))
+            // --- Sección de Saldo Actual (Ahora desde el ViewModel) ---
+            SaldoDisplayCard(label = "saldo actual", amount = uiState.saldoActual)
         }
     }
 }
 
-// --- 4. Composable para un Item Individual de Umbral de Alerta ---
+// --- Composable para un Item Individual de Umbral de Alerta ---
 @Composable
-fun AlertThresholdItem(alert: AlertThreshold) {
+fun AlertThresholdItem(
+    alert: AlertThreshold,
+    onToggleEnabled: (Long, Boolean) -> Unit = { _, _ -> }
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp), // Esquinas redondeadas
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), // Sombra sutil
-        colors = CardDefaults.cardColors(containerColor = CardColorDark) // Fondo oscuro
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = CardColorDark)
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp) // Padding interno
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween // Distribuye espacio
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Monto del Umbral (Formateado)
-            val format = NumberFormat.getCurrencyInstance(Locale("es", "CO")) // Ajusta la localización
+            val format = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
             val amountFormatted = format.format(alert.amount)
 
             Text(
                 text = amountFormatted,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = TextColorWhite, // Texto blanco
-                modifier = Modifier.weight(1f) // Permite que el texto ocupe espacio
+                color = TextColorWhite,
+                modifier = Modifier.weight(1f)
             )
 
-            // Interruptor (Switch)
-            // El estado del switch debe ser mutable si quieres que cambie al tocarlo
-            // Aquí solo mostramos el estado inicial del dato
-            var isChecked by remember { mutableStateOf(alert.isEnabled) } // Estado mutable para el switch
-
             Switch(
-                checked = isChecked, // Estado actual del switch
+                checked = alert.isEnabled,
                 onCheckedChange = { enabled ->
-                    isChecked = enabled // Actualiza el estado local al interactuar
-                    // TODO: Aquí deberías notificar a tu ViewModel o lógica
-                    // para actualizar el estado real de la alerta en tu lista/base de datos
+                    onToggleEnabled(alert.id, enabled)
                 },
-                colors = SwitchDefaults.colors( // Colores del switch
-                    checkedThumbColor = Color.White, // El "dedo" (círculo) cuando está activo
-                    checkedTrackColor = GreenToggleActive, // La "pista" (fondo) cuando está activo
-                    uncheckedThumbColor = Color.White, // El "dedo" cuando está inactivo
-                    uncheckedTrackColor = GrayToggleInactive // La "pista" cuando está inactivo
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = GreenToggleActive,
+                    uncheckedThumbColor = Color.White,
+                    uncheckedTrackColor = GrayToggleInactive
                 )
             )
         }
     }
 }
 
-// --- 5. Composable Auxiliar para Mostrar Saldos ---
+// --- Composable Auxiliar para Mostrar Saldos ---
 @Composable
 fun SaldoDisplayCard(label: String, amount: Double) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp), // Esquinas redondeadas consistentes
+        shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = CardColorDark) // Fondo oscuro
+        colors = CardDefaults.cardColors(containerColor = CardColorDark)
     ) {
         Column(
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp) // Padding interno
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .fillMaxWidth()
         ) {
             Text(
-                text = "$label:", // Etiqueta (saldo total o saldo actual)
+                text = "$label:",
                 fontSize = 16.sp,
-                color = TextColorWhite // Texto blanco
+                color = TextColorWhite
             )
-            Spacer(Modifier.height(4.dp)) // Pequeño espacio
+            Spacer(Modifier.height(4.dp))
 
-            val format = NumberFormat.getCurrencyInstance(Locale("es", "CO")) // Ajusta la localización
+            val format = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
             val amountFormatted = format.format(amount)
 
             Text(
-                text = amountFormatted, // Monto formateado
+                text = amountFormatted,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextColorWhite // Texto blanco
+                color = TextColorWhite
             )
         }
     }
 }
 
-// --- 6. Datos de Ejemplo para los Umbrales de Alerta ---
-// En una aplicación real, esto vendría de tu estado o ViewModel
-val sampleAlertThresholds = listOf(
-    AlertThreshold(1, 680000.00, true),
-    AlertThreshold(2, 600000.00, true),
-    AlertThreshold(3, 500000.00, true),
-    AlertThreshold(4, 200000.00, true) // El último en la imagen también parece activo
-)
-
-
 // --- Función @Preview para AlertasScreen ---
-// Esta función va DESPUÉS de la definición de AlertasScreen.
 @Preview(showBackground = true, showSystemUi = true, name = "Alertas Screen Preview")
 @Composable
 fun AlertasScreenPreview() {
-    // Aquí proporcionamos el entorno necesario para que el preview funcione.
-    MaterialTheme { // Envuelve con el tema Material 3 (o tu tema personalizado)
-        // Creamos un NavController de prueba. No navega, solo permite que el código compile.
+    MaterialTheme {
         val navController = rememberNavController()
+        val previewOnBackClick: () -> Unit = { println("Preview: Botón Volver clickeado") }
+        val previewOnAddAlertClick: () -> Unit = { println("Preview: Botón Añadir Alerta clickeado") }
+        val previewFunction: () -> Unit = { println("Preview: Función adicional llamada") }
 
-        // Proporcionamos lambdas de prueba para las acciones de clic y la función adicional
-        val previewOnBackClick: () -> Unit = {
-            println("Preview: Botón Volver clickeado") // Puedes poner un log
-        }
-        val previewOnAddAlertClick: () -> Unit = {
-            println("Preview: Botón Añadir Alerta clickeado") // Puedes poner un log
-        }
-        val previewFunction: () -> Unit = {
-            println("Preview: Función adicional llamada") // Puedes poner un log
-        }
-
-        // Llama a la Composable que queremos previsualizar
         AlertasScreen(
-            myNavController = navController as NavHostController, // Casteo necesario para NavHostController
+            myNavController = navController as NavHostController,
             onBackClick = previewOnBackClick,
             onAddAlertClick = previewOnAddAlertClick,
-            function = previewFunction // Pasa la lambda de prueba para 'function'
+            function = previewFunction,
+            alertsViewModel = viewModel(
+                factory = AlertsViewModelFactory(
+                    saldoDataStore = SaldoDataStore(LocalContext.current),
+                    alertThresholdsRepository = AlertThresholdsRepository(AppDatabase.getDatabase(LocalContext.current).alertThresholdDao()),
+                    applicationContext = LocalContext.current.applicationContext // ¡CORREGIDO Y COMPLETO!
+                )
+            )
         )
     }
 }
 
-// --- Cómo integrar en tu MainActivity ---
-/*
-package co.edu.unab.overa32.finanzasclaras // Tu paquete
-
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-// Importa tu tema y las pantallas necesarias
-import co.edu.unab.overa32.finanzasclaras.ui.theme.FinanzasClarasTheme
-// Importa las pantallas que necesites: AlertasScreen, PantallaPrincipalUI, etc.
-
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            FinanzasClarasTheme { // Aplica tu tema
-                val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = "mainScreen") {
-                    composable("mainScreen") {
-                        // Aquí llamas a PantallaPrincipalUI con los parámetros correctos
-                        // PantallaPrincipalUI(saldoTotal = ..., navController = navController)
-                    }
-                    composable("alertasScreen") { // Define la ruta para esta pantalla
-                         AlertasScreen(
-                            myNavController = navController, // Pasas el controlador real
-                            onBackClick = { navController.popBackStack() }, // Implementa la navegación real hacia atrás
-                            onAddAlertClick = {
-                                // TODO: Navegar a la pantalla para añadir/editar alertas
-                                // navController.navigate("ruta_añadir_alerta")
-                            },
-                            function = { /* Implementa la lógica real de esta función si es necesaria */ }
-                        )
-                    }
-                    // Define otras rutas (tablaGastos, addGasto, ajustes, addSaldo, aiScreen)
-                }
-            }
-        }
-    }
-}
-*/
+// Elimina el sampleAlertThresholds, ya que los datos se manejarán dinámicamente desde la base de datos.
+// Si aún lo tienes en tu archivo, bórralo o coméntalo.
+// val sampleAlertThresholds = listOf(...)
