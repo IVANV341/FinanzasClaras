@@ -5,21 +5,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text // Mantener si se usa Text directamente en algún composable aquí
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview // Mantener si se usa Preview directamente aquí
+import androidx.compose.ui.tooling.preview.Preview
 import co.edu.unab.overa32.finanzasclaras.ui.theme.FinanzasClarasTheme
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import android.app.Activity // Necesario para (context as? Activity)?.finishAffinity()
+import android.app.Activity
 
-// --- Importaciones de tus pantallas existentes (¡Revisar que apunten a los archivos correctos!) ---
+// --- Importaciones de tus pantallas existentes ---
 import co.edu.unab.overa32.finanzasclaras.PantallaPrincipalUI
 import co.edu.unab.overa32.finanzasclaras.AddGastoCompletoScreen
 import co.edu.unab.overa32.finanzasclaras.AddGastoScreen
@@ -45,8 +45,11 @@ import co.edu.unab.overa32.finanzasclaras.AlertasScreen
 import co.edu.unab.overa32.finanzasclaras.AddAlertScreen
 import co.edu.unab.overa32.finanzasclaras.BalanceMonitor
 
-// ¡NUEVA IMPORTACIÓN PARA LA SPLASH SCREEN!
+// --- Importaciones para la Splash Screen y el Sistema de Autenticación ---
 import co.edu.unab.overa32.finanzasclaras.SplashScreen
+import com.google.firebase.auth.FirebaseAuth
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.LaunchedEffect
 
 
 class MainActivity : ComponentActivity() {
@@ -58,8 +61,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Inicializa FirebaseApp si no lo está ya. Esto es necesario para Firebase Auth y Firestore.
+        // FirebaseApp.initializeApp(this) se llama en la versión que me enviaste.
         FirebaseApp.initializeApp(this)
-        val db = FirebaseFirestore.getInstance()
+        val db = FirebaseFirestore.getInstance() // Si usas Firestore en otras partes
+
 
         // --- LÓGICA PARA EL SISTEMA DE ALERTAS Y MONITOR ---
         // 1. Crear el canal de notificación (necesario para Android 8.0+)
@@ -67,7 +73,9 @@ class MainActivity : ComponentActivity() {
 
         // 2. Solicitar permiso de notificación (necesario para Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // TIRAMISU es API 33
+            // Verifica si el permiso ya está concedido
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                // Solicita el permiso al usuario
                 ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
             }
         }
@@ -91,10 +99,37 @@ class MainActivity : ComponentActivity() {
             val isDarkModeEnabled by ajustesDataStore.isDarkModeEnabled.collectAsState(initial = false)
             val selectedCurrency by ajustesDataStore.selectedCurrency.collectAsState(initial = "COP")
 
+            // ¡NUEVO! Instancia del AuthViewModel
+            val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory(FirebaseAuth.getInstance()))
+            // Observa el estado de autenticación
+            val authState by authViewModel.authState.collectAsState()
+
+
             FinanzasClarasTheme(darkTheme = isDarkModeEnabled) {
                 val myNavController = rememberNavController()
-                // ¡CAMBIO AQUÍ! La aplicación inicia en la SPLASH SCREEN
-                val myStartDestination = "splashScreen" // ¡CAMBIADO!
+
+                // Decide la pantalla de inicio después del Splash Screen
+                // Esta lógica se ejecuta una vez cuando el composable entra en composición.
+                // Redirige al usuario a 'main' si está autenticado, o a 'loginScreen' si no lo está.
+                LaunchedEffect(authState.isAuthenticated) {
+                    if (!authState.isLoading) { // Asegurarse de que el estado inicial no cause navegación
+                        if (authState.isAuthenticated) {
+                            myNavController.navigate("main") {
+                                // Limpia la pila para que no pueda volver a Splash/Login
+                                popUpTo("splashScreen") { inclusive = true }
+                            }
+                        } else {
+                            myNavController.navigate("loginScreen") {
+                                // Limpia la pila para que no pueda volver a Splash
+                                popUpTo("splashScreen") { inclusive = true }
+                            }
+                        }
+                    }
+                }
+
+                // La startDestination inicial del NavHost siempre será la SplashScreen.
+                // Luego el LaunchedEffect se encargará de la redirección.
+                val myStartDestination = "splashScreen" // La aplicación siempre inicia con la Splash Screen
 
                 val saldoTotalState by saldoDataStore.getSaldo.collectAsState(initial = 0.0)
 
@@ -103,11 +138,20 @@ class MainActivity : ComponentActivity() {
                     startDestination = myStartDestination,
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // --- ¡NUEVA RUTA! Define la SplashScreen ---
+                    // --- RUTA PARA LA SPLASH SCREEN ---
                     composable("splashScreen") {
                         SplashScreen(navController = myNavController)
                     }
 
+                    // --- RUTAS PARA AUTENTICACIÓN ---
+                    composable("loginScreen") {
+                        LoginScreen(navController = myNavController, authViewModel = authViewModel)
+                    }
+                    composable("registerScreen") {
+                        RegisterScreen(navController = myNavController, authViewModel = authViewModel)
+                    }
+
+                    // --- RUTA PARA LA PANTALLA PRINCIPAL (MAIN) ---
                     composable("main") {
                         PantallaPrincipalUI(
                             saldoTotal = saldoTotalState,
@@ -121,6 +165,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    // --- RUTAS PARA LAS PANTALLAS DE TU APP ---
                     composable("aiScreen") {
                         IaScreen(myNavController, onBackClick = { myNavController.popBackStack() }) { /* Lógica adicional */ }
                     }
@@ -172,10 +217,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Detener el monitoreo cuando la actividad se destruye
+    // Detener el monitoreo cuando la actividad se destruye para liberar recursos
     override fun onDestroy() {
         super.onDestroy()
-        balanceMonitor.stopMonitoring() // Detiene las corrutinas del monitor
+        balanceMonitor.stopMonitoring()
     }
 }
 

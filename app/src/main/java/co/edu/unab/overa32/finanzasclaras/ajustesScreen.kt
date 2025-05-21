@@ -15,10 +15,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
-import androidx.compose.runtime.* // Para remember, mutableStateOf, etc.
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext // Todavía necesario para obtener el Context en el Composable superior
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -30,6 +30,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedTextField
+import com.google.firebase.auth.FirebaseAuth // ¡NUEVO IMPORT! Para pasar a AuthViewModelFactory
+import androidx.lifecycle.viewmodel.compose.viewModel // ¡NUEVO IMPORT! Para obtener el AuthViewModel
 
 
 // --- 1. Clase Sellada para Representar Tipos de Items de Ajustes ---
@@ -46,25 +48,21 @@ sealed class SettingsItem {
 fun AjustesScreen(
     myNavController: NavHostController,
     onBackClick: () -> Unit,
+    // ¡NUEVO! Inyecta el AuthViewModel para cerrar sesión
+    authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory(FirebaseAuth.getInstance()))
 ) {
-    // Obtenemos el contexto aquí, UNA SOLA VEZ en el Composable superior.
     val currentContext = LocalContext.current
-
-    // Instancia de AjustesDataStore, la obtenemos aquí.
     val ajustesDataStore = remember { AjustesDataStore(currentContext) }
     val coroutineScope = rememberCoroutineScope()
 
-    // Estados observados de AjustesDataStore
     val isDarkModeEnabled by ajustesDataStore.isDarkModeEnabled.collectAsState(initial = false)
     val selectedCurrency by ajustesDataStore.selectedCurrency.collectAsState(initial = "COP")
     val userName by ajustesDataStore.userName.collectAsState(initial = "Usuario")
 
-    // --- Estados para controlar la visibilidad de los diálogos ---
     var showCurrencyDialog by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var newUserNameInput by remember { mutableStateOf(userName) }
 
-    // --- Activity Result Launcher para el selector de sonido del sistema ---
     val ringtonePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -74,7 +72,7 @@ fun AjustesScreen(
         }
     }
 
-    // --- Lista de Ajustes Dinámica (Recomponer cuando cambien los estados de DataStore) ---
+    // --- Lista de Ajustes Dinámica ---
     val settingsList: List<SettingsItem> = remember(
         isDarkModeEnabled, selectedCurrency, userName
     ) {
@@ -94,7 +92,7 @@ fun AjustesScreen(
             ),
 
             SettingsItem.Header("Notificaciones"),
-            // ToggleItem para alertas de gastos (este también lo pasaremos a ToggleSettingItem)
+            // ToggleItem para alertas de gastos
             SettingsItem.ToggleItem(
                 id = "expense_alerts",
                 title = "Recibir Alertas de Gastos",
@@ -125,6 +123,20 @@ fun AjustesScreen(
                 onDialogRequested = {
                     newUserNameInput = userName
                     showEditProfileDialog = true
+                }
+            ),
+            // ¡NUEVO ITEM! Botón para Cerrar Sesión
+            SettingsItem.ClickableItem(
+                id = "logout",
+                title = "Cerrar Sesión",
+                description = "Cierra tu sesión actual",
+                onClick = { context ->
+                    authViewModel.signOut() // Llama a la función de cerrar sesión del ViewModel
+                    // Después de cerrar sesión, navega de nuevo a la pantalla de login
+                    // Asegúrate de limpiar la pila de navegación para que no puedan volver atrás
+                    myNavController.navigate("loginScreen") {
+                        popUpTo(myNavController.graph.id) { inclusive = true } // Limpia toda la pila de navegación
+                    }
                 }
             ),
 
@@ -179,10 +191,9 @@ fun AjustesScreen(
                 when (item) {
                     is SettingsItem.Header -> SettingsHeader(title = item.title)
                     is SettingsItem.ClickableItem -> ClickableSettingItem(item = item, context = currentContext)
-                    // ¡PASAMOS EL CONTEXTO Y EL AJUSTESDATASTORE A TOGGLESETTINGITEM!
                     is SettingsItem.ToggleItem -> ToggleSettingItem(
                         item = item,
-                        context = currentContext, // Pasa el contexto
+                        context = currentContext,
                         ajustesDataStore = ajustesDataStore,
                         isDarkModeActive = isDarkModeEnabled
                     )
