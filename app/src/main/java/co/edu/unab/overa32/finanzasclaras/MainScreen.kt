@@ -169,7 +169,7 @@ fun PantallaPrincipalUI(
             Text("Configuracion", fontSize = 18.sp)
         }
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(100.dp)) // ¡CAMBIADO! Antes era Modifier.weight(1f)
 
         // --- Botón "Salir" ---
         Button(

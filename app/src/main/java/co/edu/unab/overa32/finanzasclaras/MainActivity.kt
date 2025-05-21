@@ -43,12 +43,15 @@ import androidx.core.content.ContextCompat
 import co.edu.unab.overa32.finanzasclaras.NotificationHelper
 import co.edu.unab.overa32.finanzasclaras.AlertasScreen
 import co.edu.unab.overa32.finanzasclaras.AddAlertScreen
-import co.edu.unab.overa32.finanzasclaras.BalanceMonitor // ¡IMPORTACIÓN NECESARIA!
+import co.edu.unab.overa32.finanzasclaras.BalanceMonitor
+
+// ¡NUEVA IMPORTACIÓN PARA LA SPLASH SCREEN!
+import co.edu.unab.overa32.finanzasclaras.SplashScreen
 
 
 class MainActivity : ComponentActivity() {
 
-    // ¡NUEVO! Instancia del monitor de saldo
+    // Instancia del monitor de saldo
     private lateinit var balanceMonitor: BalanceMonitor
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,7 +73,6 @@ class MainActivity : ComponentActivity() {
         }
 
         // 3. Inicializar y empezar a monitorear el saldo en segundo plano
-        // Usamos applicationContext para que el monitor no dependa de la Activity directamente
         val contextForMonitor = applicationContext
         val saldoDataStoreForMonitor = SaldoDataStore(contextForMonitor)
         val alertThresholdsRepositoryForMonitor = AlertThresholdsRepository(AppDatabase.getDatabase(contextForMonitor).alertThresholdDao())
@@ -83,16 +85,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current // Contexto para composables
 
-            // DataStores para la UI principal (pueden ser los mismos que para el monitor)
             val ajustesDataStore = remember { AjustesDataStore(context) }
-            val saldoDataStore = remember { SaldoDataStore(context) } // Se sigue usando para la UI
+            val saldoDataStore = remember { SaldoDataStore(context) }
 
             val isDarkModeEnabled by ajustesDataStore.isDarkModeEnabled.collectAsState(initial = false)
             val selectedCurrency by ajustesDataStore.selectedCurrency.collectAsState(initial = "COP")
 
             FinanzasClarasTheme(darkTheme = isDarkModeEnabled) {
                 val myNavController = rememberNavController()
-                val myStartDestination = "main"
+                // ¡CAMBIO AQUÍ! La aplicación inicia en la SPLASH SCREEN
+                val myStartDestination = "splashScreen" // ¡CAMBIADO!
 
                 val saldoTotalState by saldoDataStore.getSaldo.collectAsState(initial = 0.0)
 
@@ -101,6 +103,11 @@ class MainActivity : ComponentActivity() {
                     startDestination = myStartDestination,
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    // --- ¡NUEVA RUTA! Define la SplashScreen ---
+                    composable("splashScreen") {
+                        SplashScreen(navController = myNavController)
+                    }
+
                     composable("main") {
                         PantallaPrincipalUI(
                             saldoTotal = saldoTotalState,
@@ -145,7 +152,7 @@ class MainActivity : ComponentActivity() {
                     // Si CategoriasScreen no existe o no se usa, comenta/elimina esta línea.
                     // composable("categorias") { CategoriasScreen() }
 
-                    // --- RUTAS COMPOSABLE PARA EL SISTEMA DE ALERTAS (Ya integradas) ---
+                    // --- RUTAS COMPOSABLE PARA EL SISTEMA DE ALERTAS ---
                     composable("alertas") {
                         AlertasScreen(
                             myNavController = myNavController,
@@ -165,7 +172,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --- ¡NUEVO! Detener el monitoreo cuando la actividad se destruye ---
+    // Detener el monitoreo cuando la actividad se destruye
     override fun onDestroy() {
         super.onDestroy()
         balanceMonitor.stopMonitoring() // Detiene las corrutinas del monitor
