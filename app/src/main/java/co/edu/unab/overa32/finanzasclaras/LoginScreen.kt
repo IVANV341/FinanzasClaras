@@ -1,13 +1,21 @@
 package co.edu.unab.overa32.finanzasclaras
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color // Asegúrate de tener este import
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -17,140 +25,199 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.google.firebase.auth.FirebaseAuth // Importa FirebaseAuth para pasarla al Factory
-import androidx.compose.ui.graphics.Color // Para colores específicos si los usas
-import androidx.compose.foundation.shape.RoundedCornerShape // Para los botones
-import kotlinx.coroutines.launch // ¡AÑADE ESTA LÍNEA!
-import androidx.compose.runtime.rememberCoroutineScope // Asegúrate de que esta también esté
-
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlin.math.sin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(
+fun LoginScreen( // <-- INICIO DE LA FUNCIÓN LoginScreen
     navController: NavHostController,
     authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory(FirebaseAuth.getInstance()))
-) {
+) { // <-- CIERRE DE LA FUNCIÓN LoginScreen
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    val context = LocalContext.current // Para mostrar Toasts o SnackBar
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Observa el estado de autenticación del ViewModel
     val authState by authViewModel.authState.collectAsState()
 
     // Manejar la navegación después de un login exitoso
-    LaunchedEffect(authState.isAuthenticated) {
-        if (authState.isAuthenticated) {
-            navController.navigate("main") { // Navega a la pantalla principal si el login es exitoso
-                popUpTo("loginScreen") { inclusive = true } // Elimina la pantalla de login de la pila
-            }
-        }
-    }
+    LaunchedEffect(authState.isAuthenticated) { // <-- INICIO LaunchedEffect
+        if (authState.isAuthenticated) { // <-- INICIO if
+            navController.navigate("main") { // <-- INICIO navigate
+                popUpTo("loginScreen") { inclusive = true }
+            } // <-- CIERRE navigate
+        } // <-- CIERRE if
+    } // <-- CIERRE LaunchedEffect
 
     // Mostrar mensajes de error o carga
-    LaunchedEffect(authState.error) {
-        authState.error?.let {
-            scope.launch {
+    LaunchedEffect(authState.error) { // <-- INICIO LaunchedEffect
+        authState.error?.let { // <-- INICIO let
+            scope.launch { // <-- INICIO launch
                 snackbarHostState.showSnackbar(
                     message = "Error: $it",
                     duration = SnackbarDuration.Long
                 )
-            }
-        }
-    }
+            } // <-- CIERRE launch
+        } // <-- CIERRE let
+    } // <-- CIERRE LaunchedEffect
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Iniciar Sesión", color = Color.White) }, // Ajusta el color según tu tema
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF673AB7)) // Ajusta el color según tu tema (PurpleBackground)
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .background(Color(0xFF673AB7)) // Fondo púrpura (PurpleBackground)
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Bienvenido",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
+    Box( // <-- INICIO Box (Contenedor principal de fondo)
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) { // <-- CIERRE Box (Contenedor principal de fondo)
+        // Fondo con ondas abstractas (inspirado en el submarino)
+        LoginBackgroundWaves()
 
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Correo Electrónico") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors( // Usa colores de tu tema
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color.White,
-                    unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = Color.White,
-                    unfocusedLabelColor = Color.Gray,
-                    cursorColor = Color.White
+        Scaffold( // <-- INICIO Scaffold (Contenedor con TopAppBar y SnackbarHost)
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = { // <-- INICIO topBar
+                TopAppBar(
+                    title = { Text("Iniciar Sesión", color = MaterialTheme.colorScheme.onSurface) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
                 )
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Contraseña") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                visualTransformation = PasswordVisualTransformation(), // Oculta la contraseña
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors( // Usa colores de tu tema
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color.White,
-                    unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = Color.White,
-                    unfocusedLabelColor = Color.Gray,
-                    cursorColor = Color.White
-                )
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = { authViewModel.loginUser(email, password) },
-                enabled = !authState.isLoading, // Deshabilita el botón si está cargando
+            } // <-- CIERRE topBar
+            , // <-- IMPORTANTE: La coma va aquí si el bloque topBar está cerrado
+            containerColor = Color.Transparent // Fondo transparente para ver el Box de abajo
+        ) { paddingValues -> // <-- INICIO el bloque de contenido de Scaffold
+            Column( // <-- INICIO Column (Contenido central)
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), // Color Verde (GreenToggleActive)
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                if (authState.isLoading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                } else {
-                    Text("Iniciar Sesión", fontSize = 18.sp, color = Color.White)
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
+                    .padding(paddingValues)
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) { // <-- CIERRE Column (Contenido central)
+                // Logo de la aplicación
+                Image(
+                    painter = painterResource(id = R.drawable.logofinanzasclaras), // Tu logo
+                    contentDescription = "Logo de la aplicación",
+                    modifier = Modifier
+                        .size(120.dp)
+                        .padding(bottom = 24.dp)
+                )
 
-            TextButton(onClick = { navController.navigate("registerScreen") }) {
-                Text("¿No tienes cuenta? Regístrate aquí.", color = Color.White)
-            }
-        }
-    }
-}
+                Text(
+                    text = "Bienvenido de nuevo",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 32.dp)
+                )
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Correo Electrónico") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Contraseña") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = { authViewModel.loginUser(email, password) },
+                    enabled = !authState.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                ) {
+                    if (authState.isLoading) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Iniciar Sesión", fontSize = 18.sp, color = MaterialTheme.colorScheme.onPrimary)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TextButton(onClick = { navController.navigate("registerScreen") }) {
+                    Text("¿No tienes cuenta? Regístrate aquí.", color = MaterialTheme.colorScheme.primary)
+                }
+            } // <-- CIERRE de la Columna principal de contenido.
+        } // <-- CIERRE del Scaffold.
+    } // <-- CIERRE del Box principal.
+} // <-- CIERRE de la función LoginScreen.
+
+// Composable para el fondo abstracto (ondas)
+@Composable
+fun LoginBackgroundWaves() { // <-- INICIO LoginBackgroundWaves
+    Canvas(modifier = Modifier.fillMaxSize()) { // <-- INICIO Canvas
+        val width = size.width
+        val height = size.height
+
+        // COLORES FIJOS TEMPORALMENTE (para diagnosticar el error de MaterialTheme.colorScheme)
+        val waveColor = Color(0xFFADD8E6).copy(alpha = 0.3f) // Un azul claro con opacidad
+        val lineColor = Color.Gray.copy(alpha = 0.1f)     // Un gris con opacidad
+
+        // Ondas superiores
+        val wavePathTop = Path().apply { // <-- INICIO apply
+            moveTo(0f, 0f)
+            for (i in 0..width.toInt() step 80) { // <-- INICIO for
+                val x = i.toFloat()
+                val y = (sin(x * 0.02) * 15).toFloat() + height * 0.1f
+                lineTo(x, y)
+            } // <-- CIERRE for
+            lineTo(width, 0f)
+            close()
+        } // <-- CIERRE apply
+        drawPath(path = wavePathTop, color = waveColor)
+        drawPath(path = wavePathTop, color = lineColor, style = Stroke(width = 1f))
+
+
+        // Ondas inferiores
+        val wavePathBottom = Path().apply { // <-- INICIO apply
+            moveTo(0f, height)
+            for (i in 0..width.toInt() step 80) { // <-- INICIO for
+                val x = i.toFloat()
+                val y = height - ((sin(x * 0.02 + 0.5) * 20).toFloat() + height * 0.15f)
+                lineTo(x, y)
+            } // <-- CIERRE for
+            lineTo(width, height)
+            close()
+        } // <-- CIERRE apply
+        drawPath(path = wavePathBottom, color = waveColor)
+        drawPath(path = wavePathBottom, color = lineColor, style = Stroke(width = 1f))
+    } // <-- CIERRE Canvas
+} // <-- CIERRE LoginBackgroundWaves
+
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun LoginScreenPreview() {
-    MaterialTheme {
+fun LoginScreenPreview() { // <-- INICIO LoginScreenPreview
+    MaterialTheme { // <-- INICIO MaterialTheme
         LoginScreen(navController = rememberNavController())
-    }
-}
+    } // <-- CIERRE MaterialTheme
+} // <-- CIERRE LoginScreenPreview
