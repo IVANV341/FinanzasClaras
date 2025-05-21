@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color // Asegúrate de tener este import
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import co.edu.unab.overa32.finanzasclaras.LoginBackgroundWaves // Importa la función desde su nuevo archivo
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -172,46 +173,6 @@ fun LoginScreen( // <-- INICIO DE LA FUNCIÓN LoginScreen
 } // <-- CIERRE de la función LoginScreen.
 
 // Composable para el fondo abstracto (ondas)
-@Composable
-fun LoginBackgroundWaves() { // <-- INICIO LoginBackgroundWaves
-    Canvas(modifier = Modifier.fillMaxSize()) { // <-- INICIO Canvas
-        val width = size.width
-        val height = size.height
-
-        // COLORES FIJOS TEMPORALMENTE (para diagnosticar el error de MaterialTheme.colorScheme)
-        val waveColor = Color(0xFFADD8E6).copy(alpha = 0.3f) // Un azul claro con opacidad
-        val lineColor = Color.Gray.copy(alpha = 0.1f)     // Un gris con opacidad
-
-        // Ondas superiores
-        val wavePathTop = Path().apply { // <-- INICIO apply
-            moveTo(0f, 0f)
-            for (i in 0..width.toInt() step 80) { // <-- INICIO for
-                val x = i.toFloat()
-                val y = (sin(x * 0.02) * 15).toFloat() + height * 0.1f
-                lineTo(x, y)
-            } // <-- CIERRE for
-            lineTo(width, 0f)
-            close()
-        } // <-- CIERRE apply
-        drawPath(path = wavePathTop, color = waveColor)
-        drawPath(path = wavePathTop, color = lineColor, style = Stroke(width = 1f))
-
-
-        // Ondas inferiores
-        val wavePathBottom = Path().apply { // <-- INICIO apply
-            moveTo(0f, height)
-            for (i in 0..width.toInt() step 80) { // <-- INICIO for
-                val x = i.toFloat()
-                val y = height - ((sin(x * 0.02 + 0.5) * 20).toFloat() + height * 0.15f)
-                lineTo(x, y)
-            } // <-- CIERRE for
-            lineTo(width, height)
-            close()
-        } // <-- CIERRE apply
-        drawPath(path = wavePathBottom, color = waveColor)
-        drawPath(path = wavePathBottom, color = lineColor, style = Stroke(width = 1f))
-    } // <-- CIERRE Canvas
-} // <-- CIERRE LoginBackgroundWaves
 
 
 @Preview(showBackground = true, showSystemUi = true)

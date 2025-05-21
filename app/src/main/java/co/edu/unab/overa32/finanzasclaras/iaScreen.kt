@@ -1,5 +1,6 @@
 package co.edu.unab.overa32.finanzasclaras
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,39 +24,43 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow // ¡AÑADIDA! Importación para asStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.flow.first
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.compose.ui.platform.LocalContext // Importación de LocalContext
 
 
-import com.google.ai.client.generativeai.GenerativeModel
-import com.google.ai.client.generativeai.type.GenerateContentResponse
-
-
-// --- 1. Definición del modelo de datos para un mensaje de chat ---
-
+// --- 1. Definición del modelo de datos para un mensaje de chat (AHORA EN ARCHIVO SEPARADO: ChatMessage.kt) ---
+// La data class ChatMessage debe estar en su propio archivo ChatMessage.kt
 
 // --- 2. ViewModel para IaScreen ---
-class IaViewModel(private val geminiAIRepository: GeminiAIRepository) : ViewModel() {
+class IaViewModel(
+    private val geminiAIRepository: GeminiAIRepository,
+    private val saldoDataStore: SaldoDataStore,
+    private val alertThresholdsRepository: AlertThresholdsRepository,
+    private val applicationContext: Context
+) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(
             ChatMessage("1", "Hola, bienvenido a tu gestor de gastos.\n¿En qué puedo ayudarte hoy?", isUser = false)
         )
     )
-    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow() // <-- asStateFlow ahora reconocido
+    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
     fun sendMessage(text: String) {
         if (text.isBlank()) return
 
-        // 1. Añadir el mensaje del usuario
         val userMessage = ChatMessage(System.currentTimeMillis().toString(), text, isUser = true)
         _messages.value = _messages.value + userMessage
 
-        // 2. Añadir un mensaje de carga de la IA
         val loadingMessage = ChatMessage(
             id = (System.currentTimeMillis() + 1).toString(),
             text = "Escribiendo...",
@@ -64,31 +69,134 @@ class IaViewModel(private val geminiAIRepository: GeminiAIRepository) : ViewMode
         )
         _messages.value = _messages.value + loadingMessage
 
-        // 3. Llamar a la API de Gemini
         viewModelScope.launch {
-            val responseResult = geminiAIRepository.generateTextResponse(text)
+            try {
+                // 1. ¡Construye el prompt con los datos de la app!
+                val fullPrompt = buildPromptWithAppData(text)
 
-            // 4. Remover el mensaje de carga
-            _messages.value = _messages.value.filter { !it.isLoading }
+                // 2. Envía el prompt completo a la API de Gemini
+                val responseResult = geminiAIRepository.generateTextResponse(fullPrompt)
 
-            // 5. Añadir la respuesta real de la IA o el error
-            responseResult.onSuccess { aiResponse ->
-                val aiMessage = ChatMessage(System.currentTimeMillis().toString(), aiResponse, isUser = false)
-                _messages.value = _messages.value + aiMessage
-            }.onFailure { error ->
-                val errorMessage = ChatMessage(System.currentTimeMillis().toString(), "Error: ${error.message ?: "No se pudo conectar con la IA."}", isUser = false)
+                // 3. Remover el mensaje de carga
+                _messages.value = _messages.value.filter { !it.isLoading }
+
+                // 4. Añadir la respuesta real de la IA o el error
+                responseResult.onSuccess { aiResponse ->
+                    val aiMessage = ChatMessage(System.currentTimeMillis().toString(), aiResponse, isUser = false)
+                    _messages.value = _messages.value + aiMessage
+                }.onFailure { error ->
+                    val errorMessage = ChatMessage(System.currentTimeMillis().toString(), "Error: ${error.message ?: "No se pudo conectar con la IA."}", isUser = false)
+                    _messages.value = _messages.value + errorMessage
+                }
+            } catch (e: Exception) {
+                // Capturar errores durante la construcción del prompt o la lectura de datos
+                _messages.value = _messages.value.filter { !it.isLoading }
+                val errorMessage = ChatMessage(System.currentTimeMillis().toString(), "Error al obtener datos: ${e.message ?: "Error desconocido."}", isUser = false)
                 _messages.value = _messages.value + errorMessage
             }
         }
     }
+
+    // --- Función para construir el prompt con los datos de la app ---
+    private suspend fun buildPromptWithAppData(userQuestion: String): String {
+        // Obtener los datos relevantes
+        val currentSaldo = saldoDataStore.getSaldo.first() // Leer el saldo
+        val movimientos = readMovimientosFromFile() // Leer movimientos del archivo
+        val umbralesAlerta = alertThresholdsRepository.getAllAlertThresholds().first() // Leer umbrales
+
+        // Formatear los datos para el prompt
+        val formattedSaldo = "El saldo actual del usuario es: $currentSaldo."
+        val formattedMovimientos = if (movimientos.isNotEmpty()) {
+            "El historial de movimientos del usuario es el siguiente:\n" +
+                    movimientos.joinToString("\n") { (tipo, desc, monto, fecha) ->
+                        val montoStr = String.format(Locale.getDefault(), "%.2f", monto)
+                        "$fecha: ${if (tipo == "saldo") "Ingreso" else "Gasto"} de $montoStr en ${desc.ifBlank { "Sin descripción" }}"
+                    }
+        } else {
+            "El usuario no tiene movimientos registrados."
+        }
+        val formattedUmbrales = if (umbralesAlerta.isNotEmpty()) {
+            "Los umbrales de alerta configurados por el usuario son:\n" +
+                    umbralesAlerta.joinToString("\n") { alerta ->
+                        "${alerta.type} en ${String.format(Locale.getDefault(), "%.2f", alerta.amount)} (estado: ${if (alerta.isEnabled) "activada" else "desactivada"})"
+                    }
+        } else {
+            "El usuario no tiene umbrales de alerta configurados."
+        }
+
+        val formattedTips = """
+            Consejos financieros generales que puedes ofrecer:
+            - Recomendar establecer presupuestos.
+            - Sugerir revisar gastos innecesarios.
+            - Aconsejar ahorrar un porcentaje del ingreso.
+            - Explicar la importancia de un fondo de emergencia.
+            - Orientar sobre cómo usar las alertas para controlar gastos.
+            - Promover el registro constante de movimientos para un mejor control.
+        """.trimIndent()
+
+
+        // Construir el prompt completo para Gemma
+        val fullPrompt = """
+            Eres un asistente financiero amigable y experto llamado Finanzas Claras AI.
+            Tu objetivo es ayudar al usuario a entender y gestionar mejor sus finanzas personales basándote en los datos que te proporciono.
+            Si la pregunta del usuario se puede responder con los datos que te doy, úsalos.
+            Si no hay datos específicos para la pregunta, ofrece consejos generales sobre finanzas o explica que no tienes esa información detallada.
+            No inventes datos. Si el usuario te pide un análisis de sus movimientos, puedes mencionar tendencias generales si los datos lo permiten.
+            Siempre mantén un tono útil y profesional. Puedes ofrecer consejos financieros generales si la pregunta lo permite.
+            
+            Aquí tienes los datos de la cuenta del usuario:
+            $formattedSaldo
+            $formattedMovimientos
+            $formattedUmbrales
+
+            $formattedTips
+            
+            ---
+            Pregunta del usuario: "$userQuestion"
+            ---
+            Respuesta:
+        """.trimIndent()
+        return fullPrompt
+    }
+
+    // --- Función para leer movimientos del archivo movimientos.txt ---
+    // Adapta el parseo a tu formato exacto: "tipo|descripcion|monto|fecha"
+    private fun readMovimientosFromFile(): List<MovimientoRecord> {
+        val fileName = "movimientos.txt"
+        val file = File(applicationContext.filesDir, fileName)
+        val movimientosList = mutableListOf<MovimientoRecord>()
+
+        if (file.exists()) {
+            try {
+                file.readLines().forEach { line ->
+                    val parts = line.split("|")
+                    if (parts.size == 4) {
+                        val tipo = parts[0]
+                        val desc = parts[1]
+                        val monto = parts[2].toDoubleOrNull() ?: 0.0
+                        val fecha = parts[3]
+                        movimientosList.add(MovimientoRecord(tipo, desc, monto, fecha))
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return movimientosList
+    }
 }
 
 // --- 3. ViewModelFactory para IaViewModel ---
-class IaViewModelFactory(private val geminiAIRepository: GeminiAIRepository) : ViewModelProvider.Factory {
+class IaViewModelFactory(
+    private val geminiAIRepository: GeminiAIRepository,
+    private val saldoDataStore: SaldoDataStore,
+    private val alertThresholdsRepository: AlertThresholdsRepository,
+    private val applicationContext: Context
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(IaViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return IaViewModel(geminiAIRepository) as T
+            return IaViewModel(geminiAIRepository, saldoDataStore, alertThresholdsRepository, applicationContext) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
@@ -101,7 +209,19 @@ class IaViewModelFactory(private val geminiAIRepository: GeminiAIRepository) : V
 fun IaScreen(
     myNavController: NavHostController,
     onBackClick: () -> Unit,
-    iaViewModel: IaViewModel = viewModel(factory = IaViewModelFactory(GeminiAIRepository()))
+    // Captura LocalContext.current UNA SOLA VEZ al inicio del Composable
+    // para evitar que el compilador lo malinterprete al pasarlo a la fábrica.
+    iaViewModel: IaViewModel = run {
+        val context = LocalContext.current // Captura el contexto aquí
+        viewModel(
+            factory = IaViewModelFactory(
+                geminiAIRepository = GeminiAIRepository(),
+                saldoDataStore = SaldoDataStore(context), // Pasa la variable de contexto
+                alertThresholdsRepository = AlertThresholdsRepository(AppDatabase.getDatabase(context).alertThresholdDao()), // Pasa la variable de contexto
+                applicationContext = context.applicationContext // Pasa la variable de contexto
+            )
+        )
+    }
 ) {
     var inputText by remember { mutableStateOf("") }
     val messages by iaViewModel.messages.collectAsState()
@@ -132,18 +252,15 @@ fun IaScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 reverseLayout = true // Para que los mensajes nuevos aparezcan abajo
             ) {
-                // Invertimos la lista para que el mensaje más reciente esté al final
                 items(messages.reversed()) { message ->
-                    // ¡CORREGIDO! Usamos un Row para alinear la burbuja dentro de LazyColumn
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start // Alinea mensajes
+                        horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start
                     ) {
                         MessageBubble(
                             text = message.text,
                             isAiMessage = !message.isUser,
                             isLoading = message.isLoading
-                            // No se usa modifier.fillMaxWidth() en la burbuja para que se adapte al contenido
                         )
                     }
                 }
@@ -205,7 +322,7 @@ fun IaScreen(
 @Composable
 fun MessageBubble(text: String, isAiMessage: Boolean, modifier: Modifier = Modifier, isLoading: Boolean = false) {
     Card(
-        modifier = modifier, // Ya no aplicamos align aquí
+        modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
@@ -236,19 +353,41 @@ fun MessageBubble(text: String, isAiMessage: Boolean, modifier: Modifier = Modif
 fun IaScreenPreview() {
     MaterialTheme {
         val navController = rememberNavController()
+
+        // Para el preview, necesitas un mock de GeminiAIRepository.
         val mockGeminiAIRepository = remember {
             object : GeminiAIRepository() {
-                // Sobrescribe generateTextResponse para el preview
                 override suspend fun generateTextResponse(prompt: String): Result<String> {
                     return Result.success("Esta es una respuesta de prueba de la IA en el preview para: \"$prompt\"")
                 }
             }
         }
-        // Pasamos el mock al ViewModel en el preview
+        // Para el preview, necesitamos mocks para SaldoDataStore y AlertThresholdsRepository
+        // Captura el contexto para los mocks
+        val context = LocalContext.current
+        val mockSaldoDataStore = remember {
+            object : SaldoDataStore(context) { // Pasa la variable de contexto
+                override val getSaldo: kotlinx.coroutines.flow.Flow<Double> = kotlinx.coroutines.flow.flowOf(100000.0)
+            }
+        }
+        val mockAlertThresholdsRepository = remember {
+            object : AlertThresholdsRepository(AppDatabase.getDatabase(context).alertThresholdDao()) { // Pasa la variable de contexto
+                override fun getAllAlertThresholds(): kotlinx.coroutines.flow.Flow<List<AlertThreshold>> = kotlinx.coroutines.flow.flowOf(emptyList())
+            }
+        }
+
+        // Pasamos los mocks al ViewModel en el preview
         IaScreen(
             myNavController = navController,
             onBackClick = { println("Preview: Botón Volver clickeado") },
-            iaViewModel = viewModel(factory = IaViewModelFactory(mockGeminiAIRepository))
+            iaViewModel = viewModel(
+                factory = IaViewModelFactory(
+                    geminiAIRepository = mockGeminiAIRepository,
+                    saldoDataStore = mockSaldoDataStore,
+                    alertThresholdsRepository = mockAlertThresholdsRepository,
+                    applicationContext = context.applicationContext // Pasa la variable de contexto
+                )
+            )
         )
     }
 }

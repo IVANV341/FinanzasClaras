@@ -1,12 +1,13 @@
 package co.edu.unab.overa32.finanzasclaras
-// es la clase que es llamada por alertsviewmodel para poder obtener, añadir, actualizar o eliminar umbrales por ende es el que esta en medio con viewmodel y alerthresholdao
+
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class AlertThresholdsRepository(private val alertThresholdDao: AlertThresholdDao) {
+// ¡IMPORTANTE! Clase marcada como 'open' para permitir la herencia/mocking en previews
+open class AlertThresholdsRepository(private val alertThresholdDao: AlertThresholdDao) {
 
-    // Obtiene todos los umbrales y los mapea a la clase de UI
-    fun getAllAlertThresholds(): Flow<List<AlertThreshold>> {
+    // ¡IMPORTANTE! Función marcada como 'open' para permitir el override en previews
+    open fun getAllAlertThresholds(): Flow<List<AlertThreshold>> {
         return alertThresholdDao.getAllAlertThresholds().map { entities ->
             entities.map { it.toAlertThreshold() }
         }
