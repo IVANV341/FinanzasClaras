@@ -20,11 +20,10 @@ import androidx.navigation.compose.rememberNavController
 import android.app.Activity // Necesario para (context as? Activity)?.finishAffinity()
 
 // --- Importaciones de tus pantallas existentes (¡Revisar que apunten a los archivos correctos!) ---
-import co.edu.unab.overa32.finanzasclaras.PantallaPrincipalUI // Asumimos que está en MainScreen.kt
-import co.edu.unab.overa32.finanzasclaras.AddGastoCompletoScreen // Asumimos que está en gastosCompletosScreen.kt (la lógica completa)
-import co.edu.unab.overa32.finanzasclaras.AddGastoScreen // Asumimos que está en gastos.kt (el esqueleto/placeholder)
+import co.edu.unab.overa32.finanzasclaras.PantallaPrincipalUI
+import co.edu.unab.overa32.finanzasclaras.AddGastoCompletoScreen
+import co.edu.unab.overa32.finanzasclaras.AddGastoScreen
 import co.edu.unab.overa32.finanzasclaras.IaScreen
-// import co.edu.unab.overa32.finanzasclaras.AlertasScreen // <--- Esta la usaremos de tu proyecto de alertas
 import co.edu.unab.overa32.finanzasclaras.AjustesScreen
 import co.edu.unab.overa32.finanzasclaras.TablaGastosScreen
 import co.edu.unab.overa32.finanzasclaras.SaldoScreen
@@ -35,18 +34,23 @@ import co.edu.unab.overa32.finanzasclaras.SaldoDataStore
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.FirebaseApp
 
-// --- ¡NUEVAS IMPORTACIONES PARA EL SISTEMA DE ALERTAS! ---
-import android.Manifest // Para permisos de notificación
-import android.content.pm.PackageManager // Para permisos de notificación
-import android.os.Build // Para permisos de notificación
-import androidx.core.app.ActivityCompat // Para permisos de notificación
-import androidx.core.content.ContextCompat // Para permisos de notificación
-import co.edu.unab.overa32.finanzasclaras.NotificationHelper // El helper para notificaciones
-import co.edu.unab.overa32.finanzasclaras.AlertasScreen // La pantalla de alertas
-import co.edu.unab.overa32.finanzasclaras.AddAlertScreen // La pantalla para añadir alertas
+// --- ¡NUEVAS IMPORTACIONES PARA EL SISTEMA DE ALERTAS Y MONITOR! ---
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import co.edu.unab.overa32.finanzasclaras.NotificationHelper
+import co.edu.unab.overa32.finanzasclaras.AlertasScreen
+import co.edu.unab.overa32.finanzasclaras.AddAlertScreen
+import co.edu.unab.overa32.finanzasclaras.BalanceMonitor // ¡IMPORTACIÓN NECESARIA!
 
 
 class MainActivity : ComponentActivity() {
+
+    // ¡NUEVO! Instancia del monitor de saldo
+    private lateinit var balanceMonitor: BalanceMonitor
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -54,26 +58,34 @@ class MainActivity : ComponentActivity() {
         FirebaseApp.initializeApp(this)
         val db = FirebaseFirestore.getInstance()
 
-        // --- ¡NUEVA LÓGICA PARA EL SISTEMA DE ALERTAS! ---
+        // --- LÓGICA PARA EL SISTEMA DE ALERTAS Y MONITOR ---
         // 1. Crear el canal de notificación (necesario para Android 8.0+)
         NotificationHelper.createNotificationChannel(this)
 
         // 2. Solicitar permiso de notificación (necesario para Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // TIRAMISU es API 33
-            // Verifica si el permiso ya está concedido
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                // Solicita el permiso al usuario
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101) // 101 es un request code arbitrario
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
             }
         }
-        // --- FIN LÓGICA SISTEMA DE ALERTAS ---
+
+        // 3. Inicializar y empezar a monitorear el saldo en segundo plano
+        // Usamos applicationContext para que el monitor no dependa de la Activity directamente
+        val contextForMonitor = applicationContext
+        val saldoDataStoreForMonitor = SaldoDataStore(contextForMonitor)
+        val alertThresholdsRepositoryForMonitor = AlertThresholdsRepository(AppDatabase.getDatabase(contextForMonitor).alertThresholdDao())
+
+        balanceMonitor = BalanceMonitor(saldoDataStoreForMonitor, alertThresholdsRepositoryForMonitor, contextForMonitor)
+        balanceMonitor.startMonitoring() // Inicia el monitoreo en cuanto la app se crea
+        // --- FIN LÓGICA SISTEMA DE ALERTAS Y MONITOR ---
 
 
         setContent {
-            val context = LocalContext.current
+            val context = LocalContext.current // Contexto para composables
 
+            // DataStores para la UI principal (pueden ser los mismos que para el monitor)
             val ajustesDataStore = remember { AjustesDataStore(context) }
-            val saldoDataStore = remember { SaldoDataStore(context) }
+            val saldoDataStore = remember { SaldoDataStore(context) } // Se sigue usando para la UI
 
             val isDarkModeEnabled by ajustesDataStore.isDarkModeEnabled.collectAsState(initial = false)
             val selectedCurrency by ajustesDataStore.selectedCurrency.collectAsState(initial = "COP")
@@ -115,10 +127,9 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("tablaGastos") {
-                        // Esta es la pantalla que ya tiene un botón/acción para ir a "alertas"
                         TablaGastosScreen(
                             myNavController,
-                            onNavigateToAlertas = { totalGastos -> myNavController.navigate("alertas") }, // La ruta "alertas" se define abajo
+                            onNavigateToAlertas = { totalGastos -> myNavController.navigate("alertas") },
                             selectedCurrency = selectedCurrency
                         )
                     }
@@ -134,26 +145,30 @@ class MainActivity : ComponentActivity() {
                     // Si CategoriasScreen no existe o no se usa, comenta/elimina esta línea.
                     // composable("categorias") { CategoriasScreen() }
 
-                    // --- ¡NUEVAS RUTAS COMPOSABLE PARA EL SISTEMA DE ALERTAS! ---
-                    composable("alertas") { // Esta es la ruta a la que navega TablaGastosScreen
+                    // --- RUTAS COMPOSABLE PARA EL SISTEMA DE ALERTAS (Ya integradas) ---
+                    composable("alertas") {
                         AlertasScreen(
                             myNavController = myNavController,
                             onBackClick = { myNavController.popBackStack() },
-                            onAddAlertClick = { myNavController.navigate("addAlert") }, // Ruta para añadir una nueva alerta
-                            function = { /* Parámetro sin usar en AlertasScreen, pero se mantiene la firma */ }
+                            onAddAlertClick = { myNavController.navigate("addAlert") },
+                            function = { /* ... */ }
                         )
                     }
 
-                    composable("addAlert") { // Ruta para añadir una nueva alerta
+                    composable("addAlert") {
                         AddAlertScreen(
                             navController = myNavController
-                            // El ViewModel para AddAlertScreen se inyecta directamente allí con LocalContext.current
                         )
                     }
-                    // --- FIN NUEVAS RUTAS SISTEMA DE ALERTAS ---
                 }
             }
         }
+    }
+
+    // --- ¡NUEVO! Detener el monitoreo cuando la actividad se destruye ---
+    override fun onDestroy() {
+        super.onDestroy()
+        balanceMonitor.stopMonitoring() // Detiene las corrutinas del monitor
     }
 }
 
