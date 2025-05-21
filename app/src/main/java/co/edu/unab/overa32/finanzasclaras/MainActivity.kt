@@ -167,7 +167,8 @@ class MainActivity : ComponentActivity() {
 
                     // --- RUTAS PARA LAS PANTALLAS DE TU APP ---
                     composable("aiScreen") {
-                        IaScreen(myNavController, onBackClick = { myNavController.popBackStack() }) { /* Lógica adicional */ }
+                        // ¡CORREGIDO! Ya no pasamos el parámetro 'function' porque IaScreen lo maneja internamente.
+                        IaScreen(myNavController, onBackClick = { myNavController.popBackStack() })
                     }
 
                     composable("gastos") {

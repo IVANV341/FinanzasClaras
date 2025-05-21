@@ -1,5 +1,8 @@
 // app/build.gradle.kts (Module: app)
 
+import java.util.Properties // Importación necesaria para Properties
+import java.io.FileInputStream // Importación necesaria para FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -21,6 +24,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // --- ¡IMPORTANTE! Acceso más robusto a la API Key de Gemini desde local.properties ---
+        // Se carga el archivo local.properties y se lee la clave de forma explícita
+        val properties = Properties()
+        if (rootProject.file("local.properties").exists()) {
+            properties.load(FileInputStream(rootProject.file("local.properties")))
+        }
+        buildConfigField("String", "GOOGLE_GEMINI_API_KEY", "\"${properties.getProperty("GOOGLE_GEMINI_API_KEY")}\"")
     }
 
     buildTypes {
@@ -41,6 +52,8 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true // ¡AÑADE ESTA LÍNEA!
+
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.11"
@@ -55,6 +68,8 @@ android {
 dependencies {
     // ViewModel support for Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    // Cliente de Generative AI de Google
+    implementation("com.google.ai.client.generativeai:generativeai:0.5.0")
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
@@ -72,9 +87,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation(platform("com.google.firebase:firebase-bom:32.8.1"))
-    implementation("com.google.firebase:firebase-auth-ktx")
-
 
     // Testing
     testImplementation("junit:junit:4.13.2")
@@ -91,16 +103,14 @@ dependencies {
     // Librería de serialización JSON (si usas Kotlinx Serialization)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    // Cliente de Generative AI de Google
-    implementation("com.google.ai.client.generativeai:generativeai:0.5.0")
-
     // Firebase (si usas Firebase)
     implementation(platform("com.google.firebase:firebase-bom:32.8.1"))
     implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("androidx.core:core-ktx:1.13.1") // O la versión más reciente compatible
-    // --- ¡NUEVO! Dependencias de Room ---
+    implementation("com.google.firebase:firebase-auth-ktx")
+
+    // --- Dependencias de Room ---
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
-    kapt("androidx.room:room-compiler:$room_version") // <-- Aquí debe ser 'kapt'
+    kapt("androidx.room:room-compiler:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
 }

@@ -1,53 +1,120 @@
-package co.edu.unab.overa32.finanzasclaras // Reemplaza con tu paquete
+package co.edu.unab.overa32.finanzasclaras
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Send // Importa el ícono de enviar
-import androidx.compose.material3.* // Usamos Material 3 components
-import androidx.compose.runtime.* // Para remember y mutableStateOf
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-// ELIMINAR: import androidx.compose.ui.graphics.Color // Ya no la necesitamos si no usamos colores fijos
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.material3.MaterialTheme // ¡SÍ! Importación para MaterialTheme.colorScheme
+import androidx.compose.material3.MaterialTheme
 
-// --- 1. Definiciones de Colores --- (¡ESTAS LÍNEAS SE ELIMINAN!)
-// val SoftBackgroundColor = Color(0xFFD1C4E9)
-// val MessageBubbleColor = Color(0xFF4527A0)
-// val InputFieldBackgroundColor = Color.White
-// val SendButtonColor = Color(0xFF81C784)
-// val TextColorOnDark = Color.White
-// val TextColorOnLight = Color.Black
-// val PlaceholderTextColor = Color.Gray
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow // ¡AÑADIDA! Importación para asStateFlow
+import androidx.compose.runtime.rememberCoroutineScope
 
-// --- 2. Composable de la Pantalla de IA ---
-@OptIn(ExperimentalMaterial3Api::class) // Para TopAppBar
+
+import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.GenerateContentResponse
+
+
+// --- 1. Definición del modelo de datos para un mensaje de chat ---
+
+
+// --- 2. ViewModel para IaScreen ---
+class IaViewModel(private val geminiAIRepository: GeminiAIRepository) : ViewModel() {
+
+    private val _messages = MutableStateFlow<List<ChatMessage>>(
+        listOf(
+            ChatMessage("1", "Hola, bienvenido a tu gestor de gastos.\n¿En qué puedo ayudarte hoy?", isUser = false)
+        )
+    )
+    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow() // <-- asStateFlow ahora reconocido
+
+    fun sendMessage(text: String) {
+        if (text.isBlank()) return
+
+        // 1. Añadir el mensaje del usuario
+        val userMessage = ChatMessage(System.currentTimeMillis().toString(), text, isUser = true)
+        _messages.value = _messages.value + userMessage
+
+        // 2. Añadir un mensaje de carga de la IA
+        val loadingMessage = ChatMessage(
+            id = (System.currentTimeMillis() + 1).toString(),
+            text = "Escribiendo...",
+            isUser = false,
+            isLoading = true
+        )
+        _messages.value = _messages.value + loadingMessage
+
+        // 3. Llamar a la API de Gemini
+        viewModelScope.launch {
+            val responseResult = geminiAIRepository.generateTextResponse(text)
+
+            // 4. Remover el mensaje de carga
+            _messages.value = _messages.value.filter { !it.isLoading }
+
+            // 5. Añadir la respuesta real de la IA o el error
+            responseResult.onSuccess { aiResponse ->
+                val aiMessage = ChatMessage(System.currentTimeMillis().toString(), aiResponse, isUser = false)
+                _messages.value = _messages.value + aiMessage
+            }.onFailure { error ->
+                val errorMessage = ChatMessage(System.currentTimeMillis().toString(), "Error: ${error.message ?: "No se pudo conectar con la IA."}", isUser = false)
+                _messages.value = _messages.value + errorMessage
+            }
+        }
+    }
+}
+
+// --- 3. ViewModelFactory para IaViewModel ---
+class IaViewModelFactory(private val geminiAIRepository: GeminiAIRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(IaViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return IaViewModel(geminiAIRepository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+
+// --- 4. Composable de la Pantalla de IA ---
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IaScreen(
     myNavController: NavHostController,
-    onBackClick: () -> Unit, // Acción para el botón de volver
-    function: () -> Unit // Función adicional que recibe
+    onBackClick: () -> Unit,
+    iaViewModel: IaViewModel = viewModel(factory = IaViewModelFactory(GeminiAIRepository()))
 ) {
-    // Estado para el texto en el campo de entrada
     var inputText by remember { mutableStateOf("") }
+    val messages by iaViewModel.messages.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Asistente IA", color = MaterialTheme.colorScheme.onPrimary) }, // CAMBIADO: Texto del título sobre el color primario de la barra
+                title = { Text("Asistente IA", color = MaterialTheme.colorScheme.onPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.onPrimary) // CAMBIADO: Tint del icono sobre el color primario
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 },
-                // CAMBIADO: Fondo de la barra superior
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
             )
         },
@@ -56,27 +123,31 @@ fun IaScreen(
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize()
-                // CAMBIADO: Fondo principal de la pantalla
                 .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // --- Área para los mensajes (Estáticos por ahora) ---
-            MessageBubble(
-                text = "tienes dudas?",
-                isAiMessage = true,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            MessageBubble(
-                text = "• Hola Bienvenido a tu gestor de gastos\n• ¿Que tienes en mente?\n• ¿Necesitas ayuda con algo?",
-                isAiMessage = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // --- Espacio para que los mensajes empujen el área de entrada hacia abajo ---
-            Spacer(Modifier.weight(1f))
+            // --- Área para los mensajes (dinámicos y desplazables) ---
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                reverseLayout = true // Para que los mensajes nuevos aparezcan abajo
+            ) {
+                // Invertimos la lista para que el mensaje más reciente esté al final
+                items(messages.reversed()) { message ->
+                    // ¡CORREGIDO! Usamos un Row para alinear la burbuja dentro de LazyColumn
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start // Alinea mensajes
+                    ) {
+                        MessageBubble(
+                            text = message.text,
+                            isAiMessage = !message.isUser,
+                            isLoading = message.isLoading
+                            // No se usa modifier.fillMaxWidth() en la burbuja para que se adapte al contenido
+                        )
+                    }
+                }
+            }
 
             // --- Área de Entrada de Texto y Botón de Enviar ---
             Row(
@@ -86,15 +157,13 @@ fun IaScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Campo de Entrada de Texto
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    label = { Text("Ingresa tus dudas o escenario financiero que deseas preguntar") },
+                    label = { Text("Escribe tu pregunta...") },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(28.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        // CAMBIADO: Colores del campo de entrada
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                         disabledContainerColor = MaterialTheme.colorScheme.surface,
@@ -104,30 +173,27 @@ fun IaScreen(
                         cursorColor = MaterialTheme.colorScheme.onSurface,
                         focusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface, // Añadido para el color del texto de entrada
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface // Añadido para el color del texto de entrada
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
 
-                // *** BOTÓN DE ENVIAR ***
                 Button(
                     onClick = {
                         if (inputText.isNotBlank()) {
-                            println("Mensaje enviado: $inputText")
-                            function()
+                            iaViewModel.sendMessage(inputText)
                             inputText = ""
                         }
                     },
                     modifier = Modifier.size(56.dp),
                     shape = RoundedCornerShape(28.dp),
-                    // CAMBIADO: Color del botón de enviar (sugerencia: usa color primario o secundario)
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Send,
                         contentDescription = "Enviar Mensaje",
-                        tint = MaterialTheme.colorScheme.onSecondary // CAMBIADO: Color del icono para contrastar con secondary
+                        tint = MaterialTheme.colorScheme.onSecondary
                     )
                 }
             }
@@ -137,23 +203,29 @@ fun IaScreen(
 
 // --- Composable Auxiliar para las "Burbujas" de Mensaje ---
 @Composable
-fun MessageBubble(text: String, isAiMessage: Boolean, modifier: Modifier = Modifier) {
+fun MessageBubble(text: String, isAiMessage: Boolean, modifier: Modifier = Modifier, isLoading: Boolean = false) {
     Card(
-        modifier = modifier,
+        modifier = modifier, // Ya no aplicamos align aquí
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        // CAMBIADO: Color de la burbuja del mensaje
         colors = CardDefaults.cardColors(
             containerColor = if (isAiMessage) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.secondaryContainer
         )
     ) {
-        Text(
-            text = text,
-            // CAMBIADO: Color del texto dentro de la burbuja
-            color = if (isAiMessage) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSecondaryContainer,
-            fontSize = 16.sp,
-            modifier = Modifier.padding(12.dp)
-        )
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = text,
+                color = if (isAiMessage) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSecondaryContainer,
+                fontSize = 16.sp
+            )
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp).padding(top = 4.dp),
+                    color = if (isAiMessage) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSecondaryContainer,
+                    strokeWidth = 2.dp
+                )
+            }
+        }
     }
 }
 
@@ -164,13 +236,19 @@ fun MessageBubble(text: String, isAiMessage: Boolean, modifier: Modifier = Modif
 fun IaScreenPreview() {
     MaterialTheme {
         val navController = rememberNavController()
-        val previewOnBackClick: () -> Unit = { println("Preview: Botón Volver clickeado") }
-        val previewFunction: () -> Unit = { println("Preview: Función adicional llamada") }
-
+        val mockGeminiAIRepository = remember {
+            object : GeminiAIRepository() {
+                // Sobrescribe generateTextResponse para el preview
+                override suspend fun generateTextResponse(prompt: String): Result<String> {
+                    return Result.success("Esta es una respuesta de prueba de la IA en el preview para: \"$prompt\"")
+                }
+            }
+        }
+        // Pasamos el mock al ViewModel en el preview
         IaScreen(
-            myNavController = navController as NavHostController,
-            onBackClick = previewOnBackClick,
-            function = previewFunction
+            myNavController = navController,
+            onBackClick = { println("Preview: Botón Volver clickeado") },
+            iaViewModel = viewModel(factory = IaViewModelFactory(mockGeminiAIRepository))
         )
     }
 }
