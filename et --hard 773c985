@@ -1,0 +1,5 @@
+[33meb789b6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m SE INTENTO HACER LO DE LA IA, PERO HUBIERON BASTANTES PROBLEMAS CON EL TEMA DE LAS API PERO SE HIZO LA INFRAESTRUCUTRA
+[33m7df5e5d[m SE INTENTO HACER LO DE LA IA, PERO HUBIERON BASTANTES PROBLEMAS CON EL TEMA DE LAS API PERO SE HIZO LA INFRAESTRUCUTRA
+[33m773c985[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m Se hizo funcional el tema de la configuracion, se arreglo modo oscuro, gestor de monedas internacionales,  y distintos bugs
+[33m4af6c06[m sii
+[33m4027c23[m ya esta hecho el añadir gastos y que estos aparezcan en la tabla hay un problema que esque el saldo total solo se actualiza cuando se da al boton de ir a alertas dentro de la screen tabla de gastos
