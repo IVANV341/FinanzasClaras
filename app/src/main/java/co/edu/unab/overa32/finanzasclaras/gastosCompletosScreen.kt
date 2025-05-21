@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 
 import java.io.File
+import java.text.DecimalFormatSymbols // ¡NUEVO IMPORT!
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -65,16 +66,20 @@ fun AddGastoCompletoScreen(navController: NavController, saldoDataStore: SaldoDa
     val context = LocalContext.current
 
     var descripcion by remember { mutableStateOf("") }
-    var monto by remember { mutableStateOf("") }
+    var monto by remember { mutableStateOf("") } // Este será el string con el formato visual
 
     // Formato de moneda: ¡AHORA USA selectedCurrency!
-    val locale = when (selectedCurrency) {
-        "USD" -> Locale("en", "US")
-        "EUR" -> Locale("es", "ES")
-        "COP" -> Locale("es", "CO")
-        else -> Locale.getDefault()
+    val locale = remember(selectedCurrency) { // Usamos remember para recalcular solo cuando selectedCurrency cambie
+        when (selectedCurrency) {
+            "USD" -> Locale("en", "US")
+            "EUR" -> Locale("es", "ES")
+            "COP" -> Locale("es", "CO")
+            else -> Locale.getDefault()
+        }
     }
-    val format = NumberFormat.getCurrencyInstance(locale)
+    // ¡NUEVO! Obtenemos los DecimalFormatSymbols para la locale actual
+    val symbols = remember(locale) { DecimalFormatSymbols(locale) }
+    // format ya se usa para mostrar, no para el input directamente.
 
 
     Scaffold(
@@ -131,7 +136,11 @@ fun AddGastoCompletoScreen(navController: NavController, saldoDataStore: SaldoDa
 
             OutlinedTextField(
                 value = monto,
-                onValueChange = { monto = it },
+                onValueChange = { newValue ->
+                    // Filtra para permitir solo dígitos y el separador decimal de la localidad
+                    val filteredValue = newValue.filter { it.isDigit() || it == symbols.decimalSeparator } // ¡USANDO 'symbols' aquí!
+                    monto = filteredValue
+                },
                 label = { Text("Monto") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
@@ -147,13 +156,21 @@ fun AddGastoCompletoScreen(navController: NavController, saldoDataStore: SaldoDa
                     unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
                     unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                )
+                ),
+                // ¡NUEVO! Aplica la transformación visual aquí
+                visualTransformation = ThousandsSeparatorTransformation(locale) // Usa la locale seleccionada
             )
 
             Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = {
-                    val montoDouble = monto.toDoubleOrNull()
+                    // Limpia el string de monto antes de convertir a Double
+                    // Reemplaza el separador de grupo (punto) por vacío, y el separador decimal (coma) por punto
+                    val cleanedMonto = monto
+                        .replace(symbols.groupingSeparator.toString(), "") // ¡USANDO 'symbols' aquí!
+                        .replace(symbols.decimalSeparator.toString(), ".") // ¡USANDO 'symbols' aquí!
+
+                    val montoDouble = cleanedMonto.toDoubleOrNull()
                     if (montoDouble != null && montoDouble > 0 && descripcion.isNotBlank()) {
                         val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
                         val lineaMovimiento = "gasto|$descripcion|$montoDouble|$currentDate\n"

@@ -19,6 +19,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
+import java.util.Locale
 import co.edu.unab.overa32.finanzasclaras.AlertThresholdsRepository
 import co.edu.unab.overa32.finanzasclaras.AppDatabase
 
@@ -86,8 +87,10 @@ fun AddAlertScreen(
             OutlinedTextField(
                 value = amountText,
                 onValueChange = { newValue ->
-                    // Permite solo números y un punto decimal
-                    amountText = newValue.filter { it.isDigit() || it == '.' }
+                    // Asegúrate de que este filtro sea consistente con tu ThousandsSeparatorTransformation
+                    // Si el usuario pone coma (,), se acepta y la transformación lo maneja
+                    val cleanedValue = newValue.filter { it.isDigit() || it == ',' || it == '.' }
+                    amountText = cleanedValue
                 },
                 label = { Text("Monto del Umbral", color = TextColorWhite) },
                 singleLine = true,
@@ -101,7 +104,9 @@ fun AddAlertScreen(
                     unfocusedLabelColor = TextColorGray,
                     cursorColor = TextColorWhite
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                // ¡NUEVO! Aplica la transformación visual aquí
+                visualTransformation = ThousandsSeparatorTransformation(Locale("es", "CO")) // Usa la localización de Colombia
             )
             Spacer(Modifier.height(16.dp))
 
