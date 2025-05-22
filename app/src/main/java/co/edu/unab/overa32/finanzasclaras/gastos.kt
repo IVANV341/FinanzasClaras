@@ -1,3 +1,13 @@
+
+
+// Este archivo contiene la pantalla `AddGastoScreen`, que sirve como un esqueleto
+// o marcador de posición para la funcionalidad de añadir nuevos gastos.
+// Incluye una `TopAppBar` básica con un botón de retroceso y un texto central
+// que indica su propósito, además de un botón simple para volver a la pantalla anterior.
+// Se integra con `NavController` y `SaldoDataStore` para futuras implementaciones.
+
+
+
 package co.edu.unab.overa32.finanzasclaras // Reemplaza con tu paquete
 
 import androidx.compose.foundation.background

@@ -1,3 +1,9 @@
+// Este archivo define la clase `AlertThresholdsRepository`, la cual actúa como una capa de abstracción
+// entre el ViewModel y el DAO de Room para los umbrales de alerta.
+// Proporciona métodos para obtener todos los umbrales (como un Flow de `AlertThreshold`),
+// insertar, actualizar y eliminar umbrales, manejando la conversión entre las data classes
+// de la UI (`AlertThreshold`) y las entidades de Room (`AlertThresholdEntity`).
+
 package co.edu.unab.overa32.finanzasclaras
 
 import kotlinx.coroutines.flow.Flow

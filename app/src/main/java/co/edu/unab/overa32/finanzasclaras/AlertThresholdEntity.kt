@@ -1,3 +1,11 @@
+
+
+// Este archivo define la entidad de base de datos `AlertThresholdEntity` para Room.
+// Representa la estructura de una tabla en la base de datos que almacena los umbrales de alerta,
+// incluyendo su ID, el monto, si está habilitado y el tipo de alerta (saldo alto/bajo).
+// También contiene funciones de mapeo para convertir entre esta entidad de Room y la data class
+// `AlertThreshold` utilizada en otras partes de la aplicación.
+
 package co.edu.unab.overa32.finanzasclaras
 
 import androidx.room.ColumnInfo

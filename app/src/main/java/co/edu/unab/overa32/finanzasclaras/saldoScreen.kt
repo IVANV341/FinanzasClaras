@@ -1,3 +1,10 @@
+// Este archivo define la pantalla `SaldoScreen`, la cual permite al usuario añadir
+// dinero a su saldo total. Incluye campos para una descripción opcional y el monto
+// a añadir, con formateo de moneda y validación de entrada. Al guardar, el monto
+// se registra como un "movimiento de saldo" en un archivo y se actualiza el saldo
+// total persistido a través de `SaldoDataStore`.
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import android.annotation.SuppressLint

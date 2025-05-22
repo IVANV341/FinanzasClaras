@@ -1,3 +1,11 @@
+// Este archivo define el `AlertsViewModel`, que actúa como el cerebro de la pantalla de alertas.
+// Gestiona el estado de la UI relacionado con las alertas (saldo, umbrales, carga, errores).
+// Se comunica con `SaldoDataStore` para obtener el saldo actual y con `AlertThresholdsRepository`
+// para manejar los umbrales de alerta (añadir, activar/desactivar, eliminar).
+// Además, implementa la lógica para verificar si el saldo cruza algún umbral y dispara
+// notificaciones utilizando `NotificationHelper`.
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import android.content.Context // ¡IMPORTANTE! Nuevo import

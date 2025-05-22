@@ -1,3 +1,13 @@
+// Este archivo define la pantalla `RegisterScreen`, que permite a los usuarios
+// crear una nueva cuenta en la aplicación. Solicita un correo electrónico y una
+// contraseña (con confirmación), y utiliza `AuthViewModel` para manejar el proceso
+// de registro con Firebase. Incluye una interfaz de usuario limpia con campos de
+// texto y un botón de registro, además de un fondo animado con ondas y la opción
+// de volver a la pantalla de inicio de sesión.
+
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import androidx.compose.foundation.Canvas

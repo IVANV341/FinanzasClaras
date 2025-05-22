@@ -1,3 +1,11 @@
+// Este archivo define la pantalla de bienvenida (`SplashScreen`) de la aplicación.
+// Muestra el logo de la aplicación durante un período de tiempo determinado y,
+// al finalizar, navega automáticamente a la siguiente pantalla (usualmente la principal
+// o la de inicio de sesión), eliminándose de la pila de navegación para que el usuario
+// no pueda volver a ella.
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import androidx.compose.foundation.Image

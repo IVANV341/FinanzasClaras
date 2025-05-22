@@ -66,7 +66,9 @@ android {
 }
 
 dependencies {
-    // ViewModel support for Compose
+    // Librería de serialización JSON (si usas Kotlinx Serialization)
+// Librería de serialización JSON (si usas Kotlinx Serialization)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0") // ¡CORREGIDO!    // ViewModel support for Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     // Cliente de Generative AI de Google
     implementation("com.google.ai.client.generativeai:generativeai:0.5.0")
@@ -101,7 +103,6 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:$nav_version")
 
     // Librería de serialización JSON (si usas Kotlinx Serialization)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Firebase (si usas Firebase)
     implementation(platform("com.google.firebase:firebase-bom:32.8.1"))

@@ -1,3 +1,13 @@
+// Este archivo define la interfaz de usuario principal de la aplicación, `PantallaPrincipalUI`.
+// Muestra el saldo total del usuario, así como botones para navegar a las funcionalidades clave
+// como añadir gastos, ver la tabla de gastos, configurar ajustes, acceder al asistente de IA,
+// añadir saldo y salir de la aplicación. El diseño utiliza temas de Material Design 3
+// y adaptabilidad al modo oscuro, con un fondo degradado que evoca un "tema submarino".
+
+
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import android.annotation.SuppressLint

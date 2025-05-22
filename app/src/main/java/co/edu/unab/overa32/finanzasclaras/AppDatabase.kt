@@ -1,3 +1,10 @@
+
+// Este archivo configura la base de datos Room para la aplicación.
+// Define las entidades que se almacenarán (`AlertThresholdEntity` y `ChatHistoryEntry`),
+// especifica la versión de la base de datos y los DAOs (`AlertThresholdDao`, `ChatHistoryDao`)
+// para interactuar con las tablas. También incluye convertidores de tipos para manejar
+// enumeraciones y fechas en la base de datos.
+
 package co.edu.unab.overa32.finanzasclaras
 
 import android.content.Context
@@ -7,10 +14,13 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 
-@Database(entities = [AlertThresholdEntity::class], version = 2, exportSchema = false) // ¡VERSIÓN AUMENTADA A 2!
-@TypeConverters(Converters::class)
+// ¡IMPORTANTE! Aumenta la versión si ya tenías la 2 por cambios anteriores
+// Añade ChatHistoryEntry a las entidades
+@Database(entities = [AlertThresholdEntity::class, ChatHistoryEntry::class], version = 3, exportSchema = false) // ¡VERSIÓN AUMENTADA! ¡NUEVA ENTIDAD!
+@TypeConverters(Converters::class, ChatConverters::class) // ¡AÑADIDO ChatConverters!
 abstract class AppDatabase : RoomDatabase() {
     abstract fun alertThresholdDao(): AlertThresholdDao
+    abstract fun chatHistoryDao(): ChatHistoryDao // ¡NUEVO!
 
     companion object {
         @Volatile
@@ -21,9 +31,9 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "finanzas_claras_db" // Nombre de tu base de datos
+                    "finanzas_claras_db"
                 )
-                    .fallbackToDestructiveMigration() // ¡NUEVO! Destruye y recrea la DB si el esquema cambia
+                    .fallbackToDestructiveMigration() // Asegúrate de que esto está para desarrollo
                     .build()
                 INSTANCE = instance
                 instance
@@ -32,7 +42,7 @@ abstract class AppDatabase : RoomDatabase() {
     }
 }
 
-// Tus Converters para AlertType (sin cambios)
+// Tus Converters existentes para AlertType (sin cambios)
 class Converters {
     @TypeConverter
     fun fromAlertType(value: AlertType): String {
@@ -44,3 +54,5 @@ class Converters {
         return enumValueOf(value)
     }
 }
+
+// ChatConverters ya está definido en ChatHistoryEntry.kt

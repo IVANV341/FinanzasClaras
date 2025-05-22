@@ -1,3 +1,9 @@
+// Este archivo define el `AuthViewModel`, que maneja toda la lógica de autenticación
+// de usuarios con Firebase. Incluye la gestión del estado de autenticación (usuario actual,
+// si está cargando o si hay errores), y funciones para registrarse, iniciar sesión
+// y cerrar la sesión de un usuario.
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import androidx.lifecycle.ViewModel

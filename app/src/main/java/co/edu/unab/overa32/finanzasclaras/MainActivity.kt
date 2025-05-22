@@ -1,3 +1,15 @@
+// Este archivo es la actividad principal de la aplicación, `MainActivity`.
+// Se encarga de la configuración inicial de la aplicación, como la habilitación
+// del modo EdgeToEdge, la inicialización de Firebase, la creación del canal de notificaciones
+// y la solicitud de permisos. Es el punto de entrada para la composición de la UI
+// de Jetpack Compose, gestionando la navegación entre las diferentes pantallas
+// de la aplicación (Login, Registro, Principal, Gastos, Alertas, Ajustes, etc.)
+// utilizando `NavController`. También inicializa y gestiona el `BalanceMonitor`
+// para las alertas en segundo plano.
+
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import android.os.Bundle
@@ -167,8 +179,11 @@ class MainActivity : ComponentActivity() {
 
                     // --- RUTAS PARA LAS PANTALLAS DE TU APP ---
                     composable("aiScreen") {
-                        // ¡CORREGIDO! Ya no pasamos el parámetro 'function' porque IaScreen lo maneja internamente.
-                        IaScreen(myNavController, onBackClick = { myNavController.popBackStack() })
+                        IaScreen(
+                            myNavController = myNavController,
+                            onBackClick = { myNavController.popBackStack() },
+                            applicationContextFromActivity = applicationContext // ¡AÑADIDO!
+                        )
                     }
 
                     composable("gastos") {

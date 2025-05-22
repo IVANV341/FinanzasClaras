@@ -1,3 +1,9 @@
+
+
+// Este archivo define el Composable `AddAlertScreen`, que es la interfaz de usuario para añadir nuevos umbrales de alerta.
+// Permite a los usuarios ingresar una cantidad y seleccionar si la alerta es para un "saldo bajo" o un "saldo alto".
+// Interactúa con el `AlertsViewModel` para guardar la nueva alerta.
+
 package co.edu.unab.overa32.finanzasclaras
 
 import androidx.compose.foundation.background

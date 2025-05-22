@@ -1,4 +1,12 @@
-// app/src/main/java/co/edu/unab/overa32/finanzasclaras/SaldoDataStore.kt
+// Este archivo gestiona el almacenamiento y recuperación del saldo total
+// de la aplicación utilizando DataStore. Proporciona métodos para leer el saldo
+// actual como un flujo de datos (`Flow<Double>`) y para guardar un nuevo valor de saldo.
+// Utiliza un delegado de DataStore definido externamente para asegurar una única
+// instancia del DataStore a través del contexto de la aplicación.
+
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import android.content.Context

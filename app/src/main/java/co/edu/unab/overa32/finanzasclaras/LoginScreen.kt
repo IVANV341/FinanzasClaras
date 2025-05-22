@@ -1,3 +1,10 @@
+// Este archivo define la pantalla `LoginScreen`, que es la interfaz de usuario para
+// que los usuarios inicien sesión en la aplicación. Permite ingresar el correo electrónico
+// y la contraseña, e interactúa con `AuthViewModel` para manejar la autenticación
+// a través de Firebase. También incluye un enlace para el registro de nuevos usuarios
+// y un fondo con ondas animadas para un atractivo visual.
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import androidx.compose.foundation.Canvas

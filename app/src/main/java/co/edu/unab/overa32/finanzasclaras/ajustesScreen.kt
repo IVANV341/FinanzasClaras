@@ -1,3 +1,9 @@
+// Este archivo define la pantalla de ajustes de la aplicación, `AjustesScreen`.
+// Permite a los usuarios configurar diversas opciones como el modo oscuro, la moneda,
+// editar su perfil, y gestionar notificaciones. También incluye la funcionalidad
+// de cerrar sesión. Utiliza `DataStore` para persistir las preferencias del usuario.
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import android.content.Context

@@ -1,3 +1,11 @@
+// Este archivo define la pantalla `TablaGastosScreen`, que muestra un historial detallado
+// de todos los movimientos financieros del usuario (gastos e ingresos) leídos desde un archivo.
+// Permite visualizar el tipo de movimiento, descripción, monto y fecha, y ofrece la
+// funcionalidad de eliminar movimientos individuales, lo que a su vez actualiza el saldo.
+// También incluye botones para navegar a la pantalla de alertas y para borrar todo el historial.
+
+
+
 package co.edu.unab.overa32.finanzasclaras // Reemplaza con tu paquete
 
 import android.annotation.SuppressLint

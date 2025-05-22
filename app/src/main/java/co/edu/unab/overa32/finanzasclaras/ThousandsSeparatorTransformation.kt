@@ -1,3 +1,11 @@
+// Este archivo define la clase `ThousandsSeparatorTransformation`, que es una `VisualTransformation`
+// utilizada en los campos de texto para formatear números con separadores de miles y decimales
+// según la configuración regional del usuario. Esto mejora la legibilidad de los montos
+// mientras el usuario escribe, sin afectar el valor numérico subyacente. También maneja
+// el posicionamiento correcto del cursor dentro del texto transformado.
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import androidx.compose.ui.text.AnnotatedString

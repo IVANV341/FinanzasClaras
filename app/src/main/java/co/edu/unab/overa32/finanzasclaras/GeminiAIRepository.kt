@@ -1,3 +1,10 @@
+// Este archivo define la clase `GeminiAIRepository`, que se encarga de la comunicación
+// con la API de Gemini (en este caso, el modelo "gemma-3-1b-it").
+// Su función principal es enviar un 'prompt' a la IA y devolver la respuesta generada.
+// Está diseñado para ser 'open' para facilitar las pruebas y el mocking en entornos de vista previa.
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import com.google.ai.client.generativeai.GenerativeModel

@@ -1,3 +1,10 @@
+// Este archivo define el Composable `LoginBackgroundWaves`, que crea un efecto visual de ondas
+// dinámicas para usar como fondo en pantallas de inicio de sesión o similares.
+// Utiliza `Canvas` para dibujar dos conjuntos de ondas (superiores e inferiores) con colores fijos
+// y opacidades para un efecto sutil y animado, sin depender directamente del tema de Material Design.
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import androidx.compose.foundation.Canvas

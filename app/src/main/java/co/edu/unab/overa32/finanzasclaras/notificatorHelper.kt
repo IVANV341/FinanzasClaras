@@ -1,4 +1,16 @@
+
+
+// Este archivo define el objeto `NotificationHelper`, que contiene funciones utilitarias
+// para crear y gestionar notificaciones en la aplicación. Incluye la creación de un canal
+// de notificación para alertas de saldo (esencial para Android 8.0+) y una función para
+// mostrar notificaciones personalizadas cuando el saldo del usuario alcanza o supera
+// un umbral predefinido, considerando el tipo de alerta (saldo alto o bajo).
+
+
+
+
 package co.edu.unab.overa32.finanzasclaras
+
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

@@ -1,3 +1,11 @@
+// Este archivo define la clase `BalanceMonitor`, la cual opera en segundo plano para
+// supervisar constantemente el saldo del usuario en relación con los umbrales de alerta configurados.
+// Utiliza `CoroutineScope` y `Flow.combine` para reaccionar a cambios en el saldo o las alertas,
+// y dispara notificaciones a través de `NotificationHelper` cuando se cumplen las condiciones de un umbral.
+// Es crucial para garantizar que las alertas funcionen incluso cuando la aplicación no está en primer plano.
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import android.content.Context

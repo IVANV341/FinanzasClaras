@@ -1,3 +1,14 @@
+// Este archivo define la pantalla `IaScreen`, que es la interfaz principal del asistente de IA.
+// Muestra el historial de mensajes entre el usuario y la IA, permite al usuario enviar nuevas preguntas,
+// y tiene un botón para ver el historial completo de la conversación en un diálogo.
+// El `IaViewModel` gestiona la lógica de la conversación, interactuando con `GeminiAIRepository`
+// para las respuestas de la IA y con `SaldoDataStore` y `AlertThresholdsRepository` para
+// construir prompts basados en los datos financieros del usuario.
+
+
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import android.content.Context
@@ -8,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.History // Import for history icon
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,7 +46,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.ui.platform.LocalContext // Importación de LocalContext
+import androidx.compose.ui.platform.LocalContext
 
 
 // --- 1. Definición del modelo de datos para un mensaje de chat (AHORA EN ARCHIVO SEPARADO: ChatMessage.kt) ---
@@ -143,14 +155,14 @@ class IaViewModel(
             Si no hay datos específicos para la pregunta, ofrece consejos generales sobre finanzas o explica que no tienes esa información detallada.
             No inventes datos. Si el usuario te pide un análisis de sus movimientos, puedes mencionar tendencias generales si los datos lo permiten.
             Siempre mantén un tono útil y profesional. Puedes ofrecer consejos financieros generales si la pregunta lo permite.
-            
+
             Aquí tienes los datos de la cuenta del usuario:
             $formattedSaldo
             $formattedMovimientos
             $formattedUmbrales
 
             $formattedTips
-            
+
             ---
             Pregunta del usuario: "$userQuestion"
             ---
@@ -159,8 +171,6 @@ class IaViewModel(
         return fullPrompt
     }
 
-    // --- Función para leer movimientos del archivo movimientos.txt ---
-    // Adapta el parseo a tu formato exacto: "tipo|descripcion|monto|fecha"
     private fun readMovimientosFromFile(): List<MovimientoRecord> {
         val fileName = "movimientos.txt"
         val file = File(applicationContext.filesDir, fileName)
@@ -209,22 +219,21 @@ class IaViewModelFactory(
 fun IaScreen(
     myNavController: NavHostController,
     onBackClick: () -> Unit,
-    // Captura LocalContext.current UNA SOLA VEZ al inicio del Composable
-    // para evitar que el compilador lo malinterprete al pasarlo a la fábrica.
-    iaViewModel: IaViewModel = run {
-        val context = LocalContext.current // Captura el contexto aquí
-        viewModel(
-            factory = IaViewModelFactory(
-                geminiAIRepository = GeminiAIRepository(),
-                saldoDataStore = SaldoDataStore(context), // Pasa la variable de contexto
-                alertThresholdsRepository = AlertThresholdsRepository(AppDatabase.getDatabase(context).alertThresholdDao()), // Pasa la variable de contexto
-                applicationContext = context.applicationContext // Pasa la variable de contexto
-            )
+    // ¡MODIFICADO! Acepta el contexto de la actividad directamente
+    applicationContextFromActivity: Context, // ¡NUEVO PARÁMETRO!
+    iaViewModel: IaViewModel = viewModel(
+        factory = IaViewModelFactory(
+            geminiAIRepository = GeminiAIRepository(),
+            saldoDataStore = SaldoDataStore(applicationContextFromActivity), // Usa el contexto pasado
+            alertThresholdsRepository = AlertThresholdsRepository(AppDatabase.getDatabase(applicationContextFromActivity).alertThresholdDao()), // Usa el contexto pasado
+            applicationContext = applicationContextFromActivity // Usa el contexto pasado
         )
-    }
+    )
 ) {
     var inputText by remember { mutableStateOf("") }
     val messages by iaViewModel.messages.collectAsState()
+    var showHistoryDialog by remember { mutableStateOf(false) } // State to control dialog visibility
+
 
     Scaffold(
         topBar = {
@@ -233,6 +242,11 @@ fun IaScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.onPrimary)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showHistoryDialog = true }) { // History button
+                        Icon(Icons.Default.History, contentDescription = "Ver Historial", tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -315,6 +329,13 @@ fun IaScreen(
                 }
             }
         }
+        // History Dialog
+        if (showHistoryDialog) {
+            ChatHistoryDialog(
+                messages = messages,
+                onDismiss = { showHistoryDialog = false }
+            )
+        }
     }
 }
 
@@ -346,6 +367,53 @@ fun MessageBubble(text: String, isAiMessage: Boolean, modifier: Modifier = Modif
     }
 }
 
+// --- Nuevo Composable para el Dialog de Historial ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatHistoryDialog(
+    messages: List<ChatMessage>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Historial de Conversación") },
+        text = {
+            LazyColumn {
+                items(messages) { message ->
+                    val alignment = if (message.isUser) Alignment.End else Alignment.Start
+                    val color = if (message.isUser) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                    val textColor = if (message.isUser) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalAlignment = alignment
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = color),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Text(
+                                text = message.text,
+                                color = textColor,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar")
+            }
+        }
+    )
+}
+
 
 // --- Función @Preview para IaScreen ---
 @Preview(showBackground = true, showSystemUi = true, name = "AI Screen Preview")
@@ -354,23 +422,22 @@ fun IaScreenPreview() {
     MaterialTheme {
         val navController = rememberNavController()
 
-        // Para el preview, necesitas un mock de GeminiAIRepository.
-        val mockGeminiAIRepository = remember {
+        // Mocks para el Preview
+        // Captura el contexto para los mocks
+        val context = LocalContext.current
+        val mockGeminiAIRepository = remember { // Mueve remember fuera del objeto
             object : GeminiAIRepository() {
                 override suspend fun generateTextResponse(prompt: String): Result<String> {
                     return Result.success("Esta es una respuesta de prueba de la IA en el preview para: \"$prompt\"")
                 }
             }
         }
-        // Para el preview, necesitamos mocks para SaldoDataStore y AlertThresholdsRepository
-        // Captura el contexto para los mocks
-        val context = LocalContext.current
-        val mockSaldoDataStore = remember {
+        val mockSaldoDataStore = remember { // Mueve remember fuera del objeto
             object : SaldoDataStore(context) { // Pasa la variable de contexto
                 override val getSaldo: kotlinx.coroutines.flow.Flow<Double> = kotlinx.coroutines.flow.flowOf(100000.0)
             }
         }
-        val mockAlertThresholdsRepository = remember {
+        val mockAlertThresholdsRepository = remember { // Mueve remember fuera del objeto
             object : AlertThresholdsRepository(AppDatabase.getDatabase(context).alertThresholdDao()) { // Pasa la variable de contexto
                 override fun getAllAlertThresholds(): kotlinx.coroutines.flow.Flow<List<AlertThreshold>> = kotlinx.coroutines.flow.flowOf(emptyList())
             }
@@ -380,12 +447,13 @@ fun IaScreenPreview() {
         IaScreen(
             myNavController = navController,
             onBackClick = { println("Preview: Botón Volver clickeado") },
+            applicationContextFromActivity = context.applicationContext, // Contexto para el preview
             iaViewModel = viewModel(
                 factory = IaViewModelFactory(
                     geminiAIRepository = mockGeminiAIRepository,
                     saldoDataStore = mockSaldoDataStore,
                     alertThresholdsRepository = mockAlertThresholdsRepository,
-                    applicationContext = context.applicationContext // Pasa la variable de contexto
+                    applicationContext = context.applicationContext // Contexto para el preview
                 )
             )
         )

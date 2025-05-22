@@ -1,3 +1,12 @@
+// Este archivo define la pantalla `AddGastoCompletoScreen`, que permite a los usuarios
+// registrar un nuevo gasto en la aplicación. Incluye campos para la descripción y el monto
+// del gasto, con formateo de moneda y validación de entrada. Al guardar, el gasto se
+// registra en un archivo y el saldo del usuario se actualiza utilizando `SaldoDataStore`.
+
+
+
+
+
 package co.edu.unab.overa32.finanzasclaras // Reemplaza con tu paquete
 
 import android.widget.Toast

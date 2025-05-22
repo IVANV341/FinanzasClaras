@@ -1,3 +1,13 @@
+
+
+// Este archivo define la pantalla `AlertasScreen`, que muestra los umbrales de alerta
+// configurados por el usuario. Permite ver el saldo actual y los diferentes tipos de
+// alertas (como saldo bajo o alto), con la opción de activar o desactivar cada una.
+// También proporciona un botón para añadir nuevas alertas. Interactúa con el
+// `AlertsViewModel` para obtener y gestionar los datos de las alertas y el saldo.
+
+
+
 package co.edu.unab.overa32.finanzasclaras
 
 import androidx.compose.foundation.background
